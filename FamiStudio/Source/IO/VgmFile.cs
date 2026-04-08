@@ -496,6 +496,18 @@ namespace FamiStudio
             192,24, 72, 26, 16, 28, 32, 30
         };
 
+        static readonly int[] DmcRateTableNtsc =
+        {
+            428, 380, 340, 320, 286, 254, 226, 214,
+            190, 160, 142, 128, 106,  85,  72,  54
+        };
+
+        static readonly int[] DmcRateTablePal =
+        {
+            398, 354, 316, 298, 276, 236, 210, 198,
+            176, 148, 132, 118,  98,  78,  66,  50
+        };
+
         float apuQuarterFrameClockRemainder;
         readonly int[] apuSquareLengthCounter = new int[2];
         readonly bool[] apuSquareLengthEnabled = new bool[2];
@@ -507,6 +519,11 @@ namespace FamiStudio
         bool apuTriangleControlFlag;
         int apuNoiseLengthCounter;
         bool apuNoiseLengthEnabled;
+        bool apuDmcActive;
+        bool apuDmcLoop;
+        int  apuDmcBytesRemaining;
+        double apuDmcByteRemainder;
+        double apuDmcBytesPerFrame;
 
         // Registers.
         int[] apuRegister = new int[0x100];
@@ -940,7 +957,7 @@ namespace FamiStudio
                                 }
                             case NotSoFatso.STATE_DPCMACTIVE:
                                 {
-                                    return apuRegister[0x15] & 0x10;
+                                    return apuDmcActive ? 1 : 0;
                                 }
                         }
                         break;
@@ -1981,6 +1998,30 @@ namespace FamiStudio
                             }
                         }
 
+                        if (apuDmcActive)
+                        {
+                            double exactBytes = apuDmcBytesPerFrame + apuDmcByteRemainder;
+                            int wholeBytes = (int)exactBytes;
+                            apuDmcByteRemainder = exactBytes - wholeBytes;
+
+                            apuDmcBytesRemaining -= wholeBytes;
+
+                            if (apuDmcBytesRemaining <= 0)
+                            {
+                                if (apuDmcLoop)
+                                {
+                                    apuDmcBytesRemaining = (apuRegister[0x13] << 4) + 1;
+                                    apuDmcByteRemainder = 0.0;
+                                }
+                                else
+                                {
+                                    apuDmcActive = false;
+                                    apuDmcBytesRemaining = 0;
+                                    apuDmcByteRemainder = 0.0;
+                                }
+                            }
+                        }
+
                         if (frameSkip < frame)
                         {
                             for (int c = 0; c < song.Channels.Length; c++)
@@ -2079,15 +2120,44 @@ namespace FamiStudio
                         // DPCM and length counters.
                         if (vgmData[1] == 0x15)
                         {
-                            apuRegister[0x15] = vgmData[2];
+                            int old4015 = apuRegister[0x15];
+                            int new4015 = vgmData[2];
+                            apuRegister[0x15] = new4015;
 
-                            if ((vgmData[2] & 0x01) == 0) apuSquareLengthCounter[0] = 0;
-                            if ((vgmData[2] & 0x02) == 0) apuSquareLengthCounter[1] = 0;
-                            if ((vgmData[2] & 0x04) == 0) apuTriangleLengthCounter  = 0;
-                            if ((vgmData[2] & 0x08) == 0) apuNoiseLengthCounter     = 0;
+                            if ((new4015 & 0x01) == 0) apuSquareLengthCounter[0] = 0;
+                            if ((new4015 & 0x02) == 0) apuSquareLengthCounter[1] = 0;
+                            if ((new4015 & 0x04) == 0) apuTriangleLengthCounter  = 0;
+                            if ((new4015 & 0x08) == 0) apuNoiseLengthCounter     = 0;
 
-                            if ((vgmData[2] & 0x10) > 0)
+                            bool oldDmc = (old4015 & 0x10) != 0;
+                            bool newDmc = (new4015 & 0x10) != 0;
+
+                            if (!oldDmc && newDmc)
+                            {
                                 dpcmTrigger = true;
+                                apuDmcActive = true;
+                                apuDmcBytesRemaining = (apuRegister[0x13] << 4) + 1;
+                                apuDmcByteRemainder = 0.0;
+                            }
+
+                            if (oldDmc && !newDmc)
+                            {
+                                apuDmcActive = false;
+                                apuDmcBytesRemaining = 0;
+                                apuDmcByteRemainder = 0.0;
+                            }
+                        }
+
+                        // DPCM Timing.
+                        if (vgmData[1] == 0x10)
+                        {
+                            int rateIndex = vgmData[2] & 0x0F;
+                            int timerPeriod = pal ? DmcRateTablePal[rateIndex] : DmcRateTableNtsc[rateIndex];
+                            double cpuClock = pal ? NesApu.FreqPal : NesApu.FreqNtsc;
+                            double framesPerSecond = pal ? 50.0 : 60.0;
+
+                            apuDmcLoop = (vgmData[2] & 0x40) != 0;
+                            apuDmcBytesPerFrame = (cpuClock / timerPeriod) / 8.0 / framesPerSecond;
                         }
 
                         // DPCM delta write.
