@@ -6959,10 +6959,11 @@ namespace FamiStudio
 
                 var selection = IsHighlightedNoteSelected();
                 var menu = new List<ContextMenuOption>();
+                var opt  = new List<ContextMenuOption>();
 
                 if (IsNoteSelected(mouseLocation))
                 {
-                    menu.Add(new ContextMenuOption("MenuDeleteSelection", DeleteSelectedNotesContext, () => { DeleteSelectedNotes(); }));
+                    opt.Add(new ContextMenuOption("MenuDeleteSelection", DeleteSelectedNotesContext, () => { DeleteSelectedNotes(); }));
                 }
 
                 if (note != null)
@@ -6996,19 +6997,17 @@ namespace FamiStudio
                         menu.Add(new ContextMenuOption("MenuClearSelection", ClearSelectionContext, () => { ClearSelection(); ClearHighlightedNote(); }));
                     }
 
-                    menu.Add(new ContextMenuOption("MenuSelectNote", SelectNoteRangeContext, () => { SelectSingleNote(noteLocation, mouseLocation, note); }, ContextMenuSeparator.Before));
+                    menu.Add(new ContextMenuOption("MenuSelectNote", SelectNoteRangeContext, () => { SelectSingleNote(noteLocation, mouseLocation, note); }));
                 }
                 else
                 {
                     note = channel.FindMusicalNoteAtLocation(ref noteLocation, -1);
 
                     if (note != null)
-                        menu.Add(new ContextMenuOption("MenuSelectNote", SelectNoteRangeContext, () => { SelectSingleNote(noteLocation, mouseLocation, note); }, ContextMenuSeparator.Before));
+                        opt.Add(new ContextMenuOption("MenuSelectNote", SelectNoteRangeContext, () => { SelectSingleNote(noteLocation, mouseLocation, note); }, ContextMenuSeparator.Before));
 
                     if (IsSelectionValid())
-                    {
-                        menu.Add(new ContextMenuOption("MenuClearSelection", ClearSelectionContext, () => { ClearSelection(); ClearHighlightedNote(); }));
-                    }
+                        opt.Add(new ContextMenuOption("MenuClearSelection", ClearSelectionContext, () => { ClearSelection(); ClearHighlightedNote(); }));
 
                     var scales = new[] { ScaleMajor, ScaleMinor, ScaleDorian, ScalePhrygian, ScaleLydian, ScaleMixolydian, ScaleLocrian, ScaleMelodicMinor, ScaleHarmonicMinor, ScaleDoubleHarmonic };
                     var roots = new[] { "C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B" };
@@ -7019,7 +7018,7 @@ namespace FamiStudio
                         var j = i; // Important, copy for lamdba.
                         var name = scales[i];
 
-                        options[i] = new ContextMenuOption(name, tooltip, () => { scaleType = j; }, () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 ? Platform.IsMobile ? ContextMenuSeparator.MobileBefore : ContextMenuSeparator.Before : ContextMenuSeparator.None);
+                        options[i] = new ContextMenuOption(name, tooltip, () => { scaleType = j; }, () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 && Platform.IsMobile ? ContextMenuSeparator.MobileBefore : i == scales.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
                     }
 
                     for (var i = 0; i < roots.Length; i++)
@@ -7027,10 +7026,20 @@ namespace FamiStudio
                         var j = i; // Important, copy for lamdba.
                         var name = roots[i];
 
-                        options[i + scales.Length] = new ContextMenuOption(name, tooltip, () => { rootNoteIdx = j; }, () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 ? Platform.IsMobile ? ContextMenuSeparator.MobileBefore : ContextMenuSeparator.Before : ContextMenuSeparator.None);
+                        options[i + scales.Length] = new ContextMenuOption(name, tooltip, () => { rootNoteIdx = j; }, () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 && Platform.IsMobile ? ContextMenuSeparator.MobileBefore : i == roots.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
                     }
 
                     menu.AddRange(options);
+
+                    // We insert these at the top on mobile for convenience.
+                    if (Platform.IsMobile)
+                    {
+                        menu.InsertRange(0, opt);
+                    }
+                    else
+                    {
+                        menu.AddRange(opt);
+                    }
                 }
 
                 if (menu.Count > 0)
