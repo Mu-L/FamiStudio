@@ -883,7 +883,7 @@ namespace FamiStudio
                             {
                             case NotSoFatso.STATE_VOLUME:
                             {
-                                if ((apuRegister[0x15] & 0x08) == 0 || apuNoiseLengthCounter <= 0)
+                                if ((apuRegister[0x15] & 0x08) == 0 || apuNoiseLengthCounter < 0)
                                     return 0;
 
                                 var reg400C  = apuRegister[0x0C];
@@ -1950,7 +1950,7 @@ namespace FamiStudio
                                 if (apuTriangleLengthEnabled && apuTriangleLengthCounter > 0)
                                     apuTriangleLengthCounter--;
 
-                                if (apuNoiseLengthEnabled && apuNoiseLengthCounter > 0)
+                                if (apuNoiseLengthEnabled && apuNoiseLengthCounter > -1)
                                     apuNoiseLengthCounter--;
 
                                 // Square sweep.
