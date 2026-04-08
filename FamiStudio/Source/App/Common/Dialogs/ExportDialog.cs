@@ -428,9 +428,8 @@ namespace FamiStudio
             {
                 case ExportFormat.WavMp3:
                     var audioSettings = project.AudioExportConfig;
-                    var lastAudioSong = project.GetSong(audioSettings.SongId);
                     var loopModes     = new string[] { LoopNTimesOption, DurationOption };
-                    page.AddDropDownList(SongLabel.Colon, songNames, lastAudioSong != null ? lastAudioSong.Name : app.SelectedSong.Name, SingleSongTooltip); // 0
+                    page.AddDropDownList(SongLabel.Colon, songNames, app.SelectedSong.Name, SingleSongTooltip); // 0
                     page.AddDropDownList(FormatLabel.Colon, AudioFormatType.Names, AudioFormatType.Names.Contains(audioSettings.Format) ? audioSettings.Format : "WAV", WavFormatTooltip); // 1
                     page.AddDropDownList(SampleRateLabel.Colon, audioSampleRates, audioSampleRates.Contains(audioSettings.SampleRate) ? audioSettings.SampleRate : "44100", SampleRateTooltip); // 2
                     page.AddDropDownList(BitRateLabel.Colon, audioBitRates, audioBitRates.Contains(audioSettings.BitRate) ? audioSettings.BitRate : "192", AudioBitRateTooltip); // 3
@@ -445,7 +444,7 @@ namespace FamiStudio
                         new ColumnDesc("", 0.0f, ColumnType.CheckBox), 
                         new ColumnDesc(ChannelColumn, 0.4f), 
                         new ColumnDesc(PanColumn, 0.6f, 0, 100, (o) => FormattableString.Invariant($"{(int)o} %")) 
-                    }, GetDefaultChannelsGridData(false, false, lastAudioSong ?? app.SelectedSong, out _), 7, ChannelGridTooltip); // 11
+                    }, GetDefaultChannelsGridData(false, false, app.SelectedSong, out _), 7, ChannelGridTooltip); // 11
                     page.AddButton(null, ResetDefaultsLabel.Format(FormatAudioMessage.ToString().ToLowerInvariant())); // 12
                     page.SetPropertyEnabled( 3, false);
                     page.SetPropertyEnabled( 6, false);
@@ -460,13 +459,12 @@ namespace FamiStudio
                     if (Platform.CanExportToVideo)
                     {
                         var videoSettings     = project.VideoExportConfig;
-                        var lastVideoSong     = project.GetSong(videoSettings.SongId);
                         var videoModes        = Localization.ToStringArray(VideoMode.LocalizedNames);
                         var videoResolutions  = Localization.ToStringArray(VideoResolution.LocalizedNames);
                         var videoOscColors    = Localization.ToStringArray(OscilloscopeColorType.LocalizedNames);
-                        var channelsGridData  = GetDefaultChannelsGridData(true, true, lastVideoSong ?? app.SelectedSong, out var numActiveChannels);
+                        var channelsGridData  = GetDefaultChannelsGridData(true, true, app.SelectedSong, out var numActiveChannels);
                         page.AddDropDownList(VideoModeLabel.Colon, videoModes, videoModes.Contains(videoSettings.Mode) ? videoSettings.Mode : videoModes[VideoMode.Oscilloscope], VideoModeTooltip); // 0
-                        page.AddDropDownList(SongLabel.Colon, songNames, lastVideoSong != null ? lastVideoSong.Name : app.SelectedSong.Name, SingleSongTooltip); // 1
+                        page.AddDropDownList(SongLabel.Colon, songNames, app.SelectedSong.Name, SingleSongTooltip); // 1
                         page.AddDropDownList(ResolutionLabel.Colon, videoResolutions, videoResolutions.Contains(videoSettings.Resolution) ? videoSettings.Resolution : videoResolutions[0], VideoResTooltip); // 2
                         page.AddDropDownList(FrameRateLabel.Colon, videoFrameRates, videoFrameRates.Contains(videoSettings.FrameRate) ? videoSettings.FrameRate : "50/60 FPS", FpsTooltip); // 3
                         page.AddDropDownList(AudioBitRateLabel.Colon, videoAudioBitRates, videoAudioBitRates.Contains(videoSettings.AudioBitRate) ? videoSettings.AudioBitRate : "192", AudioBitRateTooltip); // 4
@@ -551,10 +549,8 @@ namespace FamiStudio
                     break;
                 case ExportFormat.Midi:
                     var midiSettings = project.MidiExportConfig;
-                    var lastMidiSong = project.GetSong(midiSettings.SongId);
                     var midiModes    = Localization.ToStringArray(MidiExportInstrumentMode.LocalizedNames);
-
-                    page.AddDropDownList(SongLabel.Colon, songNames, lastMidiSong != null ? lastMidiSong.Name : app.SelectedSong.Name, SingleSongTooltip); // 0
+                    page.AddDropDownList(SongLabel.Colon, songNames, app.SelectedSong.Name, SingleSongTooltip); // 0
                     page.AddCheckBox(ExportVolumeAsVelocityLabel.Colon, midiSettings.VolumeVelocity, MidiVelocityTooltip); // 1
                     page.AddCheckBox(ExportSlideAsPitchWheelLabel.Colon, midiSettings.SlidesAsPitch, MidiPitchTooltip); // 2
                     page.AddNumericUpDown(PitchWheelRangeLabel.Colon, midiSettings.PitchWheelRange, 1, 24, 1, MidiPitchRangeTooltip); // 3
@@ -643,12 +639,11 @@ namespace FamiStudio
                     break;
                 case ExportFormat.VGM:
                     var vgmSettings = project.VgmExportConfig;
-                    var lastVgmSong = project.GetSong(vgmSettings.SongId);
                     int VGMWarnID;
                     const int unsupportedExpansionMask = ExpansionType.Vrc6Mask | ExpansionType.Mmc5Mask | ExpansionType.N163Mask;
                     if (Platform.IsMobile)
                         VGMWarnID = page.AddLabel(null, VGMUnsupportedExpLabel.Format(ExpansionType.GetStringForMask(project.ExpansionAudioMask & unsupportedExpansionMask)), true); // 0
-                    int VGMSongSelect = page.AddDropDownList(SongLabel.Colon, songNames, lastVgmSong != null ? lastVgmSong.Name : app.SelectedSong.Name, SongListTooltip); // 0/1
+                    int VGMSongSelect = page.AddDropDownList(SongLabel.Colon, songNames, app.SelectedSong.Name, SongListTooltip); // 0/1
                     page.AddTextBox(TrackTitleEnglishLabel.Colon, !string.IsNullOrEmpty(vgmSettings.TrackTitle) ? vgmSettings.TrackTitle : page.GetPropertyValue<string>(VGMSongSelect), 0, false, TrackTitleEnglishTooltip); // 1/2
                     page.AddTextBox(GameNameEnglishLabel.Colon, !string.IsNullOrEmpty(vgmSettings.GameName) ? vgmSettings.GameName : project.Name, 0, false, GameNameEnglishTooltip); // 2/3
                     page.AddTextBox(SystemEnglishLabel.Colon, !string.IsNullOrEmpty(vgmSettings.System) ? vgmSettings.System :

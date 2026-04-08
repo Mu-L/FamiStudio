@@ -17,6 +17,7 @@ namespace FamiStudio
         LocalizedString PreserveDPCMPaddingByte;
         LocalizedString ImportDMCValuesLabel;
         LocalizedString Ym2149AsEPSM;
+        LocalizedString FramePacingLabel;
         LocalizedString TuningLabel;
 
         #endregion
@@ -35,6 +36,7 @@ namespace FamiStudio
             dialog.Properties.AddCheckBox(PreserveDPCMPaddingByte.Colon, false);                    // 5
             dialog.Properties.AddCheckBox(ImportDMCValuesLabel.Colon, true);                        // 6
             dialog.Properties.AddCheckBox(Ym2149AsEPSM.Colon, false);                               // 7
+            dialog.Properties.AddCheckBox(FramePacingLabel.Colon, true);                            // 8
             dialog.Properties.Build();
         }
 
@@ -55,8 +57,9 @@ namespace FamiStudio
                         var preserveDpcmPadding = dialog.Properties.GetPropertyValue<bool>(5);
                         var importDmcValues     = dialog.Properties.GetPropertyValue<bool>(6);
                         var ym2149AsEpsm        = dialog.Properties.GetPropertyValue<bool>(7);
+                        var framePacing         = dialog.Properties.GetPropertyValue<bool>(8);
 
-                        var project = new VgmFile().Load(filename, patternLen, skipFrames, adjustClock, reverseDpcmBits, preserveDpcmPadding, importDmcValues, ym2149AsEpsm, tuning);
+                        var project = new VgmFile().Load(filename, patternLen, skipFrames, adjustClock, reverseDpcmBits, preserveDpcmPadding, importDmcValues, ym2149AsEpsm, framePacing, tuning);
                         action(project);
                     }
                     else

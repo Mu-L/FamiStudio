@@ -622,7 +622,7 @@ namespace FamiStudio
             }
         }
 
-        private Instrument GetVrc7Instrument(byte patch, byte[] patchRegs)
+        private Instrument GetVrc7Instrument(byte patch, byte[] patchRegs, bool sustain)
         {
             if (patch == Vrc7InstrumentPatch.Custom)
             {
@@ -658,6 +658,7 @@ namespace FamiStudio
                 {
                     instrument = project.CreateInstrument(ExpansionType.Vrc7, name);
                     instrument.Vrc7Patch = patch;
+                    instrument.Vrc7OverrideRelease = sustain;
                 }
 
                 return instrument;
@@ -1166,6 +1167,7 @@ namespace FamiStudio
                          channel.Type <= ChannelType.Vrc7Fm6)
                 {
                     var patch = (byte)NotSoFatso.NsfGetState(nsf, channel.Type, NotSoFatso.STATE_VRC7PATCH, 0);
+                    var sustain = NotSoFatso.NsfGetState(nsf, channel.Type, NotSoFatso.STATE_FMSUSTAIN, 0) > 0;
                     var regs = new byte[8];
 
                     if (patch == 0)
@@ -1174,7 +1176,7 @@ namespace FamiStudio
                             regs[i] = (byte)NotSoFatso.NsfGetState(nsf, channel.Type, NotSoFatso.STATE_FMPATCHREG, i);
                     }
 
-                    instrument = GetVrc7Instrument(patch, regs);
+                    instrument = GetVrc7Instrument(patch, regs, sustain);
                 }
                 else if (channel.Type >= ChannelType.S5BSquare1 && channel.Type <= ChannelType.S5BSquare3)
                 {
