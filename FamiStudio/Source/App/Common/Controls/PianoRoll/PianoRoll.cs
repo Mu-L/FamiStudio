@@ -584,6 +584,8 @@ namespace FamiStudio
         LocalizedString SnapToBeatsContext;
         LocalizedString SnapToBeatContextTooltip;
         LocalizedString SnapToBeatsContextTooltip;
+        LocalizedString ScaleTypeContext;
+        LocalizedString RootNoteContext;
         LocalizedString ScaleMajor;
         LocalizedString ScaleMinor;
         LocalizedString ScaleDorian;
@@ -7010,15 +7012,22 @@ namespace FamiStudio
                         opt.Add(new ContextMenuOption("MenuClearSelection", ClearSelectionContext, () => { ClearSelection(); ClearHighlightedNote(); }));
 
                     var scales = new[] { ScaleMajor, ScaleMinor, ScaleDorian, ScalePhrygian, ScaleLydian, ScaleMixolydian, ScaleLocrian, ScaleMelodicMinor, ScaleHarmonicMinor, ScaleDoubleHarmonic };
-                    var roots = new[] { "C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B" };
-                    var options = new ContextMenuOption[scales.Length + roots.Length];
+                    var roots  = new[] { "C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab", "A", "A# / Bb", "B" };
+
+                    var scaleOptions = new ContextMenuOption[scales.Length];
+                    var rootOptions  = new ContextMenuOption[roots.Length];
 
                     for (var i = 0; i < scales.Length; i++)
                     {
                         var j = i; // Important, copy for lamdba.
                         var name = scales[i];
 
-                        options[i] = new ContextMenuOption(name, tooltip, () => { scaleType = j; }, () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 && Platform.IsMobile ? ContextMenuSeparator.MobileBefore : i == scales.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
+                        scaleOptions[i] = new ContextMenuOption(
+                            name,
+                            tooltip,
+                            () => { scaleType = j; },
+                            () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
+                            i == scales.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
                     }
 
                     for (var i = 0; i < roots.Length; i++)
@@ -7026,10 +7035,25 @@ namespace FamiStudio
                         var j = i; // Important, copy for lamdba.
                         var name = roots[i];
 
-                        options[i + scales.Length] = new ContextMenuOption(name, tooltip, () => { rootNoteIdx = j; }, () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None, i == 0 && Platform.IsMobile ? ContextMenuSeparator.MobileBefore : i == roots.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
+                        rootOptions[i] = new ContextMenuOption(
+                            name,
+                            tooltip,
+                            () => { rootNoteIdx = j; },
+                            () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
+                            i == roots.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
                     }
 
-                    menu.AddRange(options);
+                    // Submenus are only supported on desktop.
+                    if (Platform.IsDesktop)
+                    {
+                        menu.Add(new ContextMenuOption(null, ScaleTypeContext, scaleOptions));
+                        menu.Add(new ContextMenuOption(null, RootNoteContext, rootOptions, ContextMenuSeparator.After));
+                    }
+                    else
+                    {
+                        menu.AddRange(scaleOptions);
+                        menu.AddRange(rootOptions);
+                    }
 
                     // We insert these at the top on mobile for convenience.
                     if (Platform.IsMobile)
