@@ -872,10 +872,13 @@ namespace FamiStudio
                             case NotSoFatso.STATE_DUTYCYCLE: return (int)(apuRegister[(channel * 4)] & 0xc0) >> 6;
                             //case NotSoFatso.STATE_VOLUME: return mWave_Squares.nLengthCount[channel] && mWave_Squares.bChannelEnabled[channel] ? mWave_Squares.nVolume[channel] : 0;
                             case NotSoFatso.STATE_VOLUME:
-                                if ((apuRegister[0x15] & (1 << channel)) == 0 || apuSquareLengthCounter[channel] <= 0)
-                                    return 0;
+                            {
+                                int reg = apuRegister[channel * 4];
+                                bool constant = (reg & 0x10) != 0;
+                                int volume = reg & 0x0F;
 
-                                return (apuRegister[(channel * 4)] & 0xf);
+                                return constant ? volume : apuDecayVolume[channel];
+                            }
                         }
                         break;
                     }
@@ -1703,7 +1706,7 @@ namespace FamiStudio
             if (adjustClock)
             {
                 if (BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) > 0)
-                    clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? 1789773 : (float)894886.5);
+                    clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? NesApu.FreqNtsc : (float)894886.5);
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x44, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF) / 4000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x48, 4)) > 0)
@@ -1923,6 +1926,32 @@ namespace FamiStudio
                         // Quarter ticks.
                         for (int t = 0; t < quarterTicks; t++)
                         {
+                            // Square volume mode.
+                            for (int i = 0; i < 2; i++)
+                            {
+                                int reg = apuRegister[i * 4];
+                                bool sqConstant = (reg & 0x10) != 0;
+                                bool sqLoop = (reg & 0x20) != 0;
+                                int sqVolume = reg & 0x0F;
+
+                                if (!sqConstant)
+                                {
+                                    if (apuDecayCounter[i] > 0)
+                                    {
+                                        apuDecayCounter[i]--;
+                                    }
+                                    else
+                                    {
+                                        apuDecayCounter[i] = sqVolume;
+
+                                        if (apuDecayVolume[i] > 0)
+                                            apuDecayVolume[i]--;
+                                        else if (sqLoop)
+                                            apuDecayVolume[i] = 15;
+                                    }
+                                }
+                            }
+
                             // Triangle linear counter.
                             if (apuTriangleLinearReloadFlag)
                                 apuTriangleLinearCounter = apuTriangleLinearReloadValue;

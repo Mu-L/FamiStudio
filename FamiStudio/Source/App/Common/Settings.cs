@@ -72,6 +72,7 @@ namespace FamiStudio
         public static bool AllowSequencerVerticalScroll = false;
         public static bool ShowImplicitStopNotes = false;
         public static bool ShowRegisterViewer = Platform.IsDesktop;
+        public static bool DimUnsupportedChannels = true;
         public static bool UseOSDialogs;
 
         // Input section
@@ -445,6 +446,7 @@ namespace FamiStudio
             AllowSequencerVerticalScroll = ini.GetBool("UI", "AllowSequencerVerticalScroll", false);
             ShowImplicitStopNotes = ini.GetBool("UI", "ShowImplicitStopNotes", false);
             ShowRegisterViewer = ini.GetBool("UI", "ShowRegisterViewer", Platform.IsDesktop);
+            DimUnsupportedChannels = ini.GetBool("UI", "DimUnsupportedChannels", true);
             UseOSDialogs = ini.GetBool("UI", "UseOSDialogs", true);
 
             // Input
@@ -680,6 +682,7 @@ namespace FamiStudio
             ini.SetBool("UI", "AllowSequencerVerticalScroll", AllowSequencerVerticalScroll);
             ini.SetBool("UI", "ShowImplicitStopNotes", ShowImplicitStopNotes);
             ini.SetBool("UI", "ShowRegisterViewer", ShowRegisterViewer);
+            ini.SetBool("UI", "DimUnsupportedChannels", DimUnsupportedChannels);
             ini.SetBool("UI", "UseOSDialogs", UseOSDialogs);
 
             // Input

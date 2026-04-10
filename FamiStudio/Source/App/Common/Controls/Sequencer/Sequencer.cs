@@ -203,6 +203,7 @@ namespace FamiStudio
         LocalizedString SelectedPatternPropertiesLabel;
         LocalizedString PatternPropertiesLabel;
         LocalizedString DeletePatternLabel;
+        LocalizedString MakePatternsUniqueLabel;
 
         // Dialogs
         LocalizedString PasteTitle;
@@ -661,8 +662,8 @@ namespace FamiStudio
             {
                 if (channelVisible[i])
                 {
-                    // For higlighting supported instrments
-                    var isInstSupported = Song.Channels[i].SupportsInstrument(selectedInstrument);
+                    // Dim unsupported channels if enabled in settings
+                    var dim = Settings.DimUnsupportedChannels && !Song.Channels[i].SupportsInstrument(selectedInstrument);
 
                     // Icon
                     var isHoverRow = hoverRow == channelToRow[i];
@@ -675,7 +676,7 @@ namespace FamiStudio
                     // Name
                     var font = i == selectedChannelIndex ? Fonts.FontMediumBold : Fonts.FontMedium;
                     var iconHeight = bmpChannels[0].ElementSize.Height * channelBitmapScale;
-                    c.DrawText(Song.Channels[i].LocalizedName, font, channelNamePosX, y + channelIconPosY, Theme.LightGreyColor2.Transparent(isInstSupported ? 255 : 80), TextFlags.MiddleLeft, 0, iconHeight);
+                    c.DrawText(Song.Channels[i].LocalizedName, font, channelNamePosX, y + channelIconPosY, Theme.LightGreyColor2.Transparent(dim ? 80 : 255), TextFlags.MiddleLeft, 0, iconHeight);
 
                     // Force display icon.
                     var ghostHoverOpacity = isHoverRow && (hoverIconMask & 2) != 0 ? 192 : 255;
@@ -684,10 +685,10 @@ namespace FamiStudio
 
                     // Hover
                     if (isHoverRow)
-                        c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.MediumGreyColor1.Transparent(isInstSupported ? 255 : 192));
+                        c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.MediumGreyColor1.Transparent(dim ? 192 : 255));
 
                     // Darken unsupported channel backgrounds
-                    if (!isInstSupported)
+                    if (dim)
                         c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.BlackColor.Transparent(80));
 
                     y += channelSizeY;
@@ -1852,6 +1853,79 @@ namespace FamiStudio
             MoveCopyOrDuplicateSelection(channelDeltaIdx, patternDeltaIdx, true, copy);
         }
 
+        private bool TryGetSelectedPatternReferenceCounts(out Dictionary<Pattern, int> patternRefCounts)
+        {
+            var tmpPatterns = GetSelectedPatterns(out _);
+            var selectedPatterns = new HashSet<Pattern>();
+
+            foreach (var pattern in tmpPatterns)
+            {
+                if (pattern != null)
+                    selectedPatterns.Add(pattern);
+            }
+
+            var counts = new Dictionary<Pattern, int>();
+            bool duplicateFound = false;
+
+            for (int i = 0; i < Song.Channels.Length; i++)
+            {
+                var channel = Song.Channels[i];
+
+                for (int j = 0; j < Song.Length; j++)
+                {
+                    var pattern = channel.PatternInstances[j];
+                    if (pattern == null || !selectedPatterns.Contains(pattern))
+                        continue;
+
+                    var count = counts.TryGetValue(pattern, out var c) ? c + 1 : 1;
+                    counts[pattern] = count;
+
+                    if (count > 1)
+                        duplicateFound = true;
+                }
+            }
+
+            patternRefCounts = counts;
+            return duplicateFound;
+        }
+
+        private void MakeSelectedPatternsUnique(Dictionary<Pattern, int> patternRefCounts = null)
+        {
+            // We can pass refs instead of needing to populate them again.
+            if (patternRefCounts == null && !TryGetSelectedPatternReferenceCounts(out patternRefCounts))
+                return;
+
+            App.UndoRedoManager.BeginTransaction(TransactionScope.Song, Song.Id);
+
+            for (int i = selectionMin.ChannelIndex; i <= selectionMax.ChannelIndex; i++)
+            {
+                var channel = Song.Channels[i];
+
+                for (int j = selectionMin.PatternIndex; j <= selectionMax.PatternIndex; j++)
+                {
+                    var pattern = channel.PatternInstances[j];
+                    if (pattern == null)
+                        continue;
+
+                    if (patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
+                    {
+                        var newPattern = CreateUniquePatternClone(pattern, channel);
+                        channel.PatternInstances[j] = newPattern;
+
+                        patternRefCounts[pattern]--;
+                        patternRefCounts[newPattern] = 1;
+                    }
+                }
+            }
+
+            Song.RemoveUnsupportedEffects();
+            Song.RemoveUnsupportedInstruments();
+            Song.DeleteNotesPastMaxInstanceLength();
+            Song.InvalidateCumulativePatternCache();
+
+            App.UndoRedoManager.EndTransaction();
+        }
+
         private bool HandleContextMenuPatternArea(int x, int y)
         {
             bool inPatternZone = GetPatternForCoord(x, y, out var location);
@@ -1862,11 +1936,16 @@ namespace FamiStudio
 
                 SetHighlightedPattern(location);
 
-                var menu = new List<ContextMenuOption>(); ;
+                var menu = new List<ContextMenuOption>();
+                var sel  = new List<ContextMenuOption>();
 
                 if (Platform.IsMobile)
                 {
                     menu.Add(new ContextMenuOption("MenuPiano", GoToPianoRollLabel, () => { GotoPianoRoll(location); }));
+                }
+                else if (pattern != null &&!IsPatternSelected(location))
+                {
+                    SetSelection(location, location);
                 }
 
                 if (IsSelectionValid() && !IsPatternSelected(location))
@@ -1892,16 +1971,15 @@ namespace FamiStudio
                     }
                     else
                     {
-                        // Right clicking an existing pattern causes the newly selected
-                        // pattern to duplicate / instantiate on top of itself on desktop.
-                        // Workaround by only selecting if selection is clear.
-                        if (Platform.IsDesktop && !IsSelectionValid())
-                            SetSelection(location, location);
-
                         menu.Add(new ContextMenuOption("MenuProperties", PatternPropertiesLabel, () => { EditPatternProperties(new Point(x, y), pattern, location, false); }, ContextMenuSeparator.Before));
                     }
 
                     menu.Insert(0, new ContextMenuOption("MenuDelete", DeletePatternLabel, () => { DeletePattern(location); }));
+                }
+
+                if (IsPatternSelected(location) && TryGetSelectedPatternReferenceCounts(out var patternRefCounts))
+                {
+                    menu.Insert(1, new ContextMenuOption("MenuInstance", MakePatternsUniqueLabel, () => { MakeSelectedPatternsUnique(patternRefCounts); }));
                 }
 
                 if (menu.Count > 0)
@@ -2358,6 +2436,20 @@ namespace FamiStudio
             return patternIndex;
         }
 
+        private Pattern CreateUniquePatternClone(Pattern pattern, Channel channel)
+        {
+            var newName = pattern.Name;
+            if (!channel.IsPatternNameUnique(newName))
+                newName = channel.GenerateUniquePatternNameSmart(pattern.Name);
+
+            var newPattern = pattern.ShallowClone(channel);
+            newPattern.RemoveUnsupportedChannelFeatures();
+            newPattern.Color = Theme.RandomCustomColor();
+            channel.RenamePattern(pattern, newName);
+
+            return newPattern;
+        }
+
         private void MoveCopyOrDuplicateSelection(int rowIdxDelta, int patternIdxDelta, bool copy, bool duplicate)
         {
             App.UndoRedoManager.BeginTransaction(TransactionScope.Song, Song.Id);
@@ -2382,21 +2474,11 @@ namespace FamiStudio
 
                         if (duplicate && sourcePattern != null)
                         {
-                            Pattern duplicatedPattern = null;
-                            if (!duplicatePatternMap.TryGetValue(sourcePattern, out duplicatedPattern))
+                            if (!duplicatePatternMap.TryGetValue(sourcePattern, out var duplicatedPattern))
                             {
                                 var destChannel = Song.Channels[ni];
-
-                                var newName = sourcePattern.Name;
-                                if (!destChannel.IsPatternNameUnique(newName))
-                                    newName = destChannel.GenerateUniquePatternNameSmart(sourcePattern.Name);
-
-                                duplicatedPattern = sourcePattern.ShallowClone(destChannel);
-                                duplicatedPattern.RemoveUnsupportedChannelFeatures();
-                                // Intentionally changing the color so that its clear it a clone.
-                                duplicatedPattern.Color = Theme.RandomCustomColor();
+                                duplicatedPattern = CreateUniquePatternClone(sourcePattern, destChannel);
                                 duplicatePatternMap.Add(sourcePattern, duplicatedPattern);
-                                destChannel.RenamePattern(duplicatedPattern, newName);
                             }
                             Song.Channels[ni].PatternInstances[nj] = duplicatedPattern;
                         }
