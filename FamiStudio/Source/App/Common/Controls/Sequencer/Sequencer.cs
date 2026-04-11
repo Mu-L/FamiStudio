@@ -1876,11 +1876,11 @@ namespace FamiStudio
 
         private bool UpdateSelectedPatternRefCounts()
         {
+            if (!IsSelectionValid())
+                return false;
+
             var tmpPatterns = GetSelectedPatterns(out _);
             var selectedPatterns = new HashSet<Pattern>();
-
-            if (tmpPatterns == null)
-                return false;
 
             foreach (var pattern in tmpPatterns)
             {
@@ -1934,9 +1934,6 @@ namespace FamiStudio
                     {
                         var newPattern = CreateUniquePatternClone(pattern, channel);
                         channel.PatternInstances[j] = newPattern;
-
-                        patternRefCounts[pattern]--;
-                        patternRefCounts[newPattern] = 1;
                     }
                 }
             }
@@ -3493,6 +3490,7 @@ namespace FamiStudio
             {
                 // TODO: This is overly aggressive. We should have the 
                 // scope on the transaction on the buffer and filter by that.
+                UpdateSelectedPatternRefCounts();
                 InvalidatePatternCache();
                 UpdateRenderCoords();
                 CancelDragSelection();
