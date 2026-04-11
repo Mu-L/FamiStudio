@@ -929,8 +929,6 @@ namespace FamiStudio
                             if (isSelected)
                                 c.DrawRectangle(0, 0, sx, channelSizeY, Theme.LightGreyColor1, 3, true, true);
 
-                            // Commented out until a major release.
-                            /*
                             if (isSelected && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
                             {
                                 var iconScale = bitmapScale;
@@ -941,7 +939,6 @@ namespace FamiStudio
 
                                 c.DrawTextureAtlas(bmpMenuInstance, iconX, iconY, iconScale, Theme.WhiteColor);
                             }
-                            */
 
                             c.PopTransform();
                         }
@@ -2465,7 +2462,7 @@ namespace FamiStudio
             var newPattern = pattern.ShallowClone(channel);
             newPattern.RemoveUnsupportedChannelFeatures();
             newPattern.Color = Theme.RandomCustomColor();
-            channel.RenamePattern(pattern, newName);
+            channel.RenamePattern(newPattern, newName);
 
             return newPattern;
         }
