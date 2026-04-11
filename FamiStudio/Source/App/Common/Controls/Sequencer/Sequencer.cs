@@ -1997,7 +1997,7 @@ namespace FamiStudio
                     menu.Insert(0, new ContextMenuOption("MenuDelete", DeletePatternLabel, () => { DeletePattern(location); }));
                 }
 
-                if (IsPatternSelected(location) && patternRefCounts?.Count > 0)
+                if (IsPatternSelected(location) && UpdateSelectedPatternRefCounts())
                 {
                     menu.Insert(1, new ContextMenuOption("MenuInstance", MakePatternsUniqueLabel, () => { MakeSelectedPatternsUnique(); }));
                 }
@@ -2655,7 +2655,11 @@ namespace FamiStudio
             }
 
             UpdateCursor();
-            UpdateSelectedPatternRefCounts();
+
+            if (IsSelectionValid())
+                UpdateSelectedPatternRefCounts();
+            else
+                patternRefCounts.Clear();
 
             if (doMouseUp)
             {
