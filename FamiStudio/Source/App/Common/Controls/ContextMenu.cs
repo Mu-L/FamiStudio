@@ -202,6 +202,10 @@ namespace FamiStudio
             var initYPos = WindowPosition.Y + index * itemSizeY;
             var yPos = initYPos + childMenu.Height > container.Height ? initYPos + itemSizeY - childMenu.Height : initYPos;
 
+            // A little nitpicky thing. Separators are a pixel lower than the bottom of the menu would be.
+            if (hoveredItemIndex < menuOptions.Length - 1)
+                yPos += 1;
+
             childMenu.Move(WindowPosition.X + Width - 1, yPos);
 
             childMenuIndex = index;
