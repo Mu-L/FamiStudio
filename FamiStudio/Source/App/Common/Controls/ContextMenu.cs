@@ -16,7 +16,7 @@ namespace FamiStudio
         private TextureAtlasRef bmpMenuCheckOn;
         private TextureAtlasRef bmpMenuCheckOff;
         private TextureAtlasRef bmpMenuRadio;
-        private TextureAtlasRef bmpMenuPlay;
+        private TextureAtlasRef bmpAccordionNavigate;
         private ContextMenuOption[] menuOptions;
         private ContextMenu parentMenu;
         private ContextMenu rootMenu;
@@ -48,10 +48,10 @@ namespace FamiStudio
         {
             var g = ParentWindow.Graphics;
 
-            bmpMenuCheckOn  = g.GetTextureAtlasRef("MenuCheckOn");
-            bmpMenuCheckOff = g.GetTextureAtlasRef("MenuCheckOff");
-            bmpMenuRadio    = g.GetTextureAtlasRef("MenuRadio");
-            bmpMenuPlay     = g.GetTextureAtlasRef("MenuPlay");
+            bmpMenuCheckOn       = g.GetTextureAtlasRef("MenuCheckOn");
+            bmpMenuCheckOff      = g.GetTextureAtlasRef("MenuCheckOff");
+            bmpMenuRadio         = g.GetTextureAtlasRef("MenuRadio");
+            bmpAccordionNavigate = g.GetTextureAtlasRef("AccordionNavigate");
             
             UpdateLayout();
         }
@@ -229,6 +229,8 @@ namespace FamiStudio
                 childMenuIndex = -1;
             }
 
+            hoveredItemIndex = -1;
+
             if (rootMenu == this)
                 deepestOpenMenu = null;
 
@@ -395,8 +397,8 @@ namespace FamiStudio
                 c.DrawText(option.Text, Fonts.FontMedium, margin + iconSizeX, 0, hover ? Theme.LightGreyColor2 : Theme.LightGreyColor1, TextFlags.MiddleLeft, Width, itemSizeY);
                 if (option.HasSubMenu)
                 {
-                    var arrowX = Width - margin - bmpMenuPlay.ElementSize.Width;
-                    c.DrawTextureAtlasCentered(bmpMenuPlay, arrowX, 0, bmpMenuPlay.ElementSize.Width, itemSizeY, 1, hover ? Theme.LightGreyColor2 : Theme.LightGreyColor1);
+                    var arrowX = Width - margin - bmpAccordionNavigate.ElementSize.Width;
+                    c.DrawTextureAtlasCentered(bmpAccordionNavigate, arrowX, 0, bmpAccordionNavigate.ElementSize.Width, itemSizeY, 1, hover ? Theme.LightGreyColor2 : Theme.LightGreyColor1);
                 }
                 c.PopTransform();
 

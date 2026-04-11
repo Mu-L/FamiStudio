@@ -724,6 +724,7 @@
     <EmbeddedResource Include="Resources\Misc\VideoWatermark.tga" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\Atlas\AccordionNavigate@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Add@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Algorithm0@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Algorithm1@4x.tga" />
