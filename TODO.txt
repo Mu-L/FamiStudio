@@ -128,10 +128,7 @@ Discord
 
 Backlog: 
 =========
-- Cant set slider to zero : https://discord.com/channels/747649221879922840/1281239636743688255
 - Arp issue alex : https://discord.com/channels/747649221879922840/1319347249884430368/1319347249884430368
-- Tempo doesnt match DAWS (50/60 + rounding).
-	https://discord.com/channels/747649221879922840/747649222354010173/1320574976490999920
 - Volgona slide note N163
 	https://discord.com/channels/@me/1312660867082620968/1316925295995125801
 - Multiple slide notes edition when selection.
@@ -146,8 +143,6 @@ Backlog:
 - FDS mod depth envelopes?
 	https://discord.com/channels/747649221879922840/747649222354010173/1289675252850360351
 - Unify mobile/desktop file operations. Remove all if {} there.
-- Disable NMI during FDS file loading
-	https://discord.com/channels/747649221879922840/798008185977176074/1235154978486878298
 - FDS test for Persune
 - VRC6 square popping how2/kawashin
 	- https://discord.com/channels/@me/819772561940152321/1231885934656753704
@@ -160,7 +155,6 @@ Backlog:
 	https://discord.com/channels/747649221879922840/747649222354010173/1231585732318199850
 - YARN : Small hitch beginning of VRC6 songs? Not sure
 - YARN : Change ini ROM code persune suggestion.
-- Could we import DMC initial values from NSF?
 - NSF/FS comparison bugs:
 	- N163 : Sound OK, but gets out of phase at the first slide note and remains like that. This is normal, this is due to slide notes not being able to be approximated correctly with fine pitch. 
 	- VRC7 : Very slight pitch issue due to pitch shift (3) used on VRC7 and how we look for best matching note.
@@ -171,7 +165,6 @@ Backlog:
 	- Dont compress vibrato envelopes.
 	- New opcode "override envelope and reset", call only when speed changes.
 - Kawashin N163 comparison with NSFPLAY, listen to Wave 1 isolated. (https://discord.com/channels/@me/1093046594062004286/1183464431674470570)
-- BUG : Why does Mesen play NSF ~0.3% to ~0.4% faster than us? Export a wav and compare. Affects both ROM and NSF.
 - Paste FX values from text. Kain wanted to change DAC slowly, had values to paste. 
 - Simple parameters for instruments (duty, volume)
 - Export selection. 
@@ -187,8 +180,6 @@ Backlog:
 - Android encoder bitrate is messed up.
 - When multiple VRC7 instrument all use patch 0 at same time (like on first note), they all upload it. Its stupid. Only the first one should, or something like that.
 - OSC trigger assert 
-- Option to keep unused samples when exporting to sound engine. 
-	=> Shelved, will need more work.
 - How to add to the "open with" list on Android.
 - Better autosave names?
 - Delete instruments resets play head.
@@ -204,15 +195,12 @@ Backlog:
 - Add effect to select N163 wave. How does it react in FT.
 - Full range volume for expansions?
 - Different aspect ratios for video export? Somebody asked for square
-- Improve linux file dialog (Steo feedback)
-- Idea from perkka "When an instrument is selected. Have the channels thats not supported by it slightly faded out, or the channel names that support it in bold or something"
 - Do a pass on tooltips for ParamProviders.
 - Left resize to preserve release position?
 - Display number of selected channels in grid for video export?
 - Reorder channels for video export.
 - Overclocking (2x, 3x, 4x would be a good start).
 - Hardware sweep (how to not conflict with smooth vibrato?)
-- Scales
 - Sound output selection?
 - Cleanup : remove duplicated fx values (ex: same volume applied multiple times)
 - Paste special, option to rename patterns.
@@ -223,7 +211,6 @@ Backlog:
 - Poppin issue on FDS? See messages from "JHĀKRI" on discord. Change volume on FDS with a blank waveform.
 - Dont reset camera in piano roll when deleting instrument (probably to handle case where you were editing the instrument)
 - Length counter support? https://www.youtube.com/watch?v=Fg8B3kiVckY
-- Double-click to edit name of instrument
 - Way to tell if a pattern has other instances, like highlight all instances when mouse over? 
 - There is no vertical scaling in effect. Vertical scaling is done with piano, there is no piano.
 	https://discord.com/channels/747649221879922840/747649222354010173/1206908564262617151
