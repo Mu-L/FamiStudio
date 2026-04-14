@@ -463,7 +463,7 @@ namespace FamiStudio
             if (n163WavPreset == WavePresetType.Resample)
                 ResampleWaveform();
             else
-                wavEnv.SetFromPreset(EnvelopeType.N163Waveform, n163WavPreset);
+                wavEnv.SetFromPreset(EnvelopeType.N163Waveform, n163WavPreset, n163WavSize);
         }
 
         public void SetN163ResampleWaveData(short[] wav)
@@ -878,7 +878,7 @@ namespace FamiStudio
             }
 
             if (IsN163 && n163WavPreset != WavePresetType.Custom && n163WavPreset != WavePresetType.Resample)
-                Debug.Assert(N163WaveformEnvelope.ValidatePreset(EnvelopeType.N163Waveform, n163WavPreset));
+                Debug.Assert(N163WaveformEnvelope.ValidatePreset(EnvelopeType.N163Waveform, n163WavPreset, n163WavSize));
             if (IsFds && fdsWavPreset != WavePresetType.Custom && fdsWavPreset != WavePresetType.Resample)
                 Debug.Assert(FdsWaveformEnvelope.ValidatePreset(EnvelopeType.FdsWaveform, fdsWavPreset));
             if (IsFds && fdsModPreset != WavePresetType.Custom)
@@ -1170,8 +1170,7 @@ namespace FamiStudio
                     // This is in case we change the code that generates the preset.
                     if (IsN163)
                     {
-                        N163WaveformEnvelope.ChunkLength = n163WavSize; // Needed for ValidatePreset.
-                        if (n163WavPreset != WavePresetType.Custom && n163WavPreset != WavePresetType.Resample && !N163WaveformEnvelope.ValidatePreset(EnvelopeType.N163Waveform, n163WavPreset))
+                        if (n163WavPreset != WavePresetType.Custom && n163WavPreset != WavePresetType.Resample && !N163WaveformEnvelope.ValidatePreset(EnvelopeType.N163Waveform, n163WavPreset, n163WavSize))
                             n163WavPreset = WavePresetType.Custom;
                     }
                     if (IsFds)

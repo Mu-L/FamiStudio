@@ -882,16 +882,21 @@ namespace FamiStudio
                 }
                 else if (instrument.IsN163)
                 {
+                    instrument.PerformPostLoadActions(); // Safety.
                     instrument.BuildWaveformsAndWaveIndexEnvelope(out var waves, out var wavIndexEnv, false);
 
                     var wavIndexEnvIdx = FindEnvelopeIndex(envelopes, instrument, wavIndexEnv, EnvelopeType.WaveformRepeat);
                     lines.Add($"INSTN163{i,4}{volEnvIdx,6}{arpEnvIdx,4}{pitEnvIdx,4}{-1,4}{wavIndexEnvIdx,4}{instrument.N163WaveSize,4}{instrument.N163WavePos,4}{waves.Length,4} \"{instrument.Name}\"");
 
                     for (int j = 0; j < waves.Length; j++)
+                    {
+                        Debug.Assert(waves[j].Length == instrument.N163WaveSize);
                         lines.Add($"N163WAVE{i,4}{j,6} : {string.Join(" ", waves[j])}");
+                    }
                 }
                 else if (instrument.IsFds)
                 {
+                    instrument.PerformPostLoadActions(); // Safety.
                     lines.Add($"INSTFDS{i,5}{1,6}{instrument.FdsModSpeed,4}{instrument.FdsModDepth,4}{instrument.FdsModDelay,4} \"{instrument.Name}\"");
                     
                     if (instrument.FdsWaveCount > 1)
