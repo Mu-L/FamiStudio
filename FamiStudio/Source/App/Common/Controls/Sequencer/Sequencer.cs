@@ -114,7 +114,7 @@ namespace FamiStudio
         TextureAtlasRef bmpDuplicateMove;
         TextureAtlasRef bmpShyOn;
         TextureAtlasRef bmpShyOff;
-        //TextureAtlasRef bmpMenuInstance;
+        TextureAtlasRef bmpMenuInstance;
 
         enum CaptureOperation
         {
@@ -540,7 +540,7 @@ namespace FamiStudio
 
             bmpShyOn = g.GetTextureAtlasRef("ShyOn");
             bmpShyOff = g.GetTextureAtlasRef("ShyOff");
-            //bmpMenuInstance = g.GetTextureAtlasRef("MenuInstance");
+            bmpMenuInstance = g.GetTextureAtlasRef("MenuInstance");
 
             seekGeometry = new float[]
             {
@@ -930,7 +930,8 @@ namespace FamiStudio
                                 c.DrawRectangle(0, 0, sx, channelSizeY, Theme.LightGreyColor1, 3, true, true);
 
                             /* Uncomment in major version, along with declaration and initialization of bmpMenuInstance. 
-                            if (IsSelectionValid() && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
+                            // TODO: Cache bools of valid selection / drag capture operation once at beginning instead of running these every iteration of the loop.
+                            if (captureOperation != CaptureOperation.DragSelection && IsSelectionValid() && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
                             {
                                 var iconW = bmpMenuInstance.ElementSize.Width  * bitmapScale;
                                 var iconH = bmpMenuInstance.ElementSize.Height * bitmapScale;
