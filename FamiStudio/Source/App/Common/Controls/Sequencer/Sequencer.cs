@@ -930,7 +930,7 @@ namespace FamiStudio
                                 c.DrawRectangle(0, 0, sx, channelSizeY, Theme.LightGreyColor1, 3, true, true);
 
                             /* Uncomment in major version, along with declaration and initialization of bmpMenuInstance. 
-                            if (isSelected && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
+                            if (IsSelectionValid() && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
                             {
                                 var iconW = bmpMenuInstance.ElementSize.Width  * bitmapScale;
                                 var iconH = bmpMenuInstance.ElementSize.Height * bitmapScale;
