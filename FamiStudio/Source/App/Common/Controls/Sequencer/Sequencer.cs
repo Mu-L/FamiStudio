@@ -114,7 +114,7 @@ namespace FamiStudio
         TextureAtlasRef bmpDuplicateMove;
         TextureAtlasRef bmpShyOn;
         TextureAtlasRef bmpShyOff;
-        TextureAtlasRef bmpMenuInstance;
+        //TextureAtlasRef bmpMenuInstance;
 
         enum CaptureOperation
         {
@@ -540,7 +540,7 @@ namespace FamiStudio
 
             bmpShyOn = g.GetTextureAtlasRef("ShyOn");
             bmpShyOff = g.GetTextureAtlasRef("ShyOff");
-            bmpMenuInstance = g.GetTextureAtlasRef("MenuInstance");
+            //bmpMenuInstance = g.GetTextureAtlasRef("MenuInstance");
 
             seekGeometry = new float[]
             {
