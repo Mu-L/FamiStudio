@@ -7027,7 +7027,7 @@ namespace FamiStudio
                             tooltip,
                             () => { scaleType = j; },
                             () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
-                            i == scales.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
+                            Platform.IsMobile && i == scales.Length - 1 ? ContextMenuSeparator.MobileAfter : ContextMenuSeparator.None);
                     }
 
                     for (var i = 0; i < roots.Length; i++)
@@ -7040,7 +7040,7 @@ namespace FamiStudio
                             tooltip,
                             () => { rootNoteIdx = j; },
                             () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
-                            i == roots.Length - 1 ? ContextMenuSeparator.After : ContextMenuSeparator.None);
+                            Platform.IsMobile && i == roots.Length - 1 ? ContextMenuSeparator.MobileAfter : ContextMenuSeparator.None);
                     }
 
                     // Submenus are only supported on desktop.
