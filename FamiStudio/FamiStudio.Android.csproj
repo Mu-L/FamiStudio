@@ -1146,13 +1146,13 @@
     <EmbeddedResource Include="Resources\Shaders\Text.vert" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Localization\FamiStudio.deu.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.eng.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.kor.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.por.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.rus.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.spa.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.zho.ini" />
+    <EmbeddedResource Include="Localization\FamiStudio.deu.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.eng.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.kor.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.por.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.rus.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.spa.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.zho.ini" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\Setup\Demo Songs\*.fms">
