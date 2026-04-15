@@ -139,16 +139,23 @@ namespace FamiStudio
                 return;
 
             var option = menuOptions[index];
-
-            Platform.VibrateTick();
-
-            if (option.HasSubMenu)
+            if (option.HasSubMenu && Platform.IsDesktop)
             {
                 OpenChildMenu(index);
                 return;
             }
 
             App.HideContextMenu();
+
+            // For mobile, we just replace the previous context menu with a new one.
+            if (option.HasSubMenu)
+            {
+                App.ShowContextMenuAsync(option.SubOptions);
+                return;
+            }
+
+            Platform.VibrateTick();
+
             MarkDirty();
             option.Callback?.Invoke();
         }

@@ -7026,8 +7026,7 @@ namespace FamiStudio
                             name,
                             tooltip,
                             () => { scaleType = j; },
-                            () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
-                            Platform.IsMobile && i == 0 ? ContextMenuSeparator.MobileBefore : ContextMenuSeparator.None);
+                            () => scaleType == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None);
                     }
 
                     for (var i = 0; i < roots.Length; i++)
@@ -7039,31 +7038,12 @@ namespace FamiStudio
                             name,
                             tooltip,
                             () => { rootNoteIdx = j; },
-                            () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None,
-                            Platform.IsMobile && i == 0 ? ContextMenuSeparator.MobileBefore : ContextMenuSeparator.None);
+                            () => rootNoteIdx == j ? ContextMenuCheckState.Radio : ContextMenuCheckState.None);
                     }
 
-                    // Submenus are only supported on desktop.
-                    if (Platform.IsDesktop)
-                    {
-                        menu.Add(new ContextMenuOption(null, ScaleTypeContext, scaleOptions));
-                        menu.Add(new ContextMenuOption(null, RootNoteContext, rootOptions, ContextMenuSeparator.After));
-                    }
-                    else
-                    {
-                        menu.AddRange(scaleOptions);
-                        menu.AddRange(rootOptions);
-                    }
-
-                    // We insert these at the top on mobile for convenience.
-                    if (Platform.IsMobile)
-                    {
-                        menu.InsertRange(0, opt);
-                    }
-                    else
-                    {
-                        menu.AddRange(opt);
-                    }
+                    menu.Add(new ContextMenuOption(null, ScaleTypeContext, scaleOptions));
+                    menu.Add(new ContextMenuOption(null, RootNoteContext, rootOptions, Platform.IsDesktop ? ContextMenuSeparator.After : ContextMenuSeparator.MobileAfter));
+                    menu.AddRange(opt);
                 }
 
                 if (menu.Count > 0)
