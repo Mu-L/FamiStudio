@@ -932,13 +932,12 @@ namespace FamiStudio
                             /* Uncomment in major version, along with declaration and initialization of bmpMenuInstance. 
                             if (isSelected && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
                             {
-                                var iconScale = bitmapScale;
-                                var iconW = bmpMenuInstance.ElementSize.Width  * iconScale;
-                                var iconH = bmpMenuInstance.ElementSize.Height * iconScale;
+                                var iconW = bmpMenuInstance.ElementSize.Width  * bitmapScale;
+                                var iconH = bmpMenuInstance.ElementSize.Height * bitmapScale;
                                 var iconX = sx / 2 - iconW / 2;
                                 var iconY = patternHeaderSizeY / 2 + channelSizeY / 2 - iconH / 2;
 
-                                c.DrawTextureAtlas(bmpMenuInstance, iconX, iconY, iconScale, Theme.WhiteColor);
+                                c.DrawTextureAtlas(bmpMenuInstance, iconX, iconY, bitmapScale, Theme.WhiteColor);
                             }
                             */
 
