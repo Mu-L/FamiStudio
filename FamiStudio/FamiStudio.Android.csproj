@@ -292,7 +292,7 @@
     <Compile Include="Source\App\Mobile\PropertyPage.cs" />
     <Compile Include="Source\App\Mobile\QuickAccessBar.cs" />
     <Compile Include="Source\App\Mobile\RadioButtonList.cs" />
-    <Compile Include="Source\App\Mobile\TopbarDialog.cs" />
+    <Compile Include="Source\App\Mobile\TopBarDialog.cs" />
     <Compile Include="Source\App\Mobile\TutorialDialog.cs" />
     <Compile Include="Source\App\Mobile\VideoPreviewDialog.cs" />
     <Compile Include="Source\Utils\AndroidMidi.cs" />
