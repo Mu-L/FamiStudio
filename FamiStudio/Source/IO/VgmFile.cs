@@ -143,14 +143,14 @@ namespace FamiStudio
                 if (project.PalMode)
                 {
                     header.rate = 50;
-                    NESClock = 1662607;
+                    NESClock = NesApu.FreqPal;
                     waitCommand = 0x63;
                     samplesPerFrame = 44100.0 / (NesApu.FreqPal / 33247.5);
                 }
                 else
                 {
                     header.rate = 60;
-                    NESClock = 1789772;
+                    NESClock = NesApu.FreqNtsc - 1; // No idea why this is 1789772, but the VGM specs mention this value.
                     waitCommand = 0x62;
                     samplesPerFrame = 44100.0 / (NesApu.FreqNtsc / 29780.5);
                 }
@@ -1737,7 +1737,7 @@ namespace FamiStudio
             var samples = samplesPerFrame * 0.5; // Offset starting point mid-frame for rounding reasons.
 
             //Looping through file to check if file is PAL
-            if (rate == 50 || nesClock == 1662607)
+            if (rate == 50 || nesClock == NesApu.FreqPal)
             {
                 pal = true;
                 project.PalMode = pal;
@@ -1808,7 +1808,7 @@ namespace FamiStudio
 
                 if (vgmCommand == 0x67)  //DataBlock
                 {
-                    var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
+                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
                     var dataType = vgmFile[vgmDataOffset + 2];
                     var dataAddr = BitConverter.ToUInt16(vgmFile.AsSpan(vgmDataOffset + 7, 2));
 
