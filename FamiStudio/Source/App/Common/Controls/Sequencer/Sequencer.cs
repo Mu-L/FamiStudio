@@ -667,7 +667,7 @@ namespace FamiStudio
                 if (channelVisible[i])
                 {
                     // Dim unsupported channels if enabled in settings
-                    var dim = Settings.DimUnsupportedChannels && !Song.Channels[i].SupportsInstrument(selectedInstrument);
+                    var dim = Settings.DimUnsupportedChannels && !Song.Channels[i].SupportsInstrument(selectedInstrument, false);
 
                     // Icon
                     var isHoverRow = hoverRow == channelToRow[i];

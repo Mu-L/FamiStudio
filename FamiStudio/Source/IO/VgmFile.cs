@@ -1746,7 +1746,7 @@ namespace FamiStudio
             {
                 if (vgmCommand == 0x67)  //DataBlock
                 {
-                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4));
+                    var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
                     vgmDataOffset = vgmDataOffset + dataSize + 7;
                 }
                 else if (vgmCommand == 0x68)
@@ -1808,7 +1808,7 @@ namespace FamiStudio
 
                 if (vgmCommand == 0x67)  //DataBlock
                 {
-                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4));
+                    var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
                     var dataType = vgmFile[vgmDataOffset + 2];
                     var dataAddr = BitConverter.ToUInt16(vgmFile.AsSpan(vgmDataOffset + 7, 2));
 
