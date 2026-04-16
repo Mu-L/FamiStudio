@@ -1939,8 +1939,6 @@ namespace FamiStudio
                 }
             }
 
-            Song.RemoveUnsupportedEffects();
-            Song.RemoveUnsupportedInstruments();
             Song.DeleteNotesPastMaxInstanceLength();
             Song.InvalidateCumulativePatternCache();
 
