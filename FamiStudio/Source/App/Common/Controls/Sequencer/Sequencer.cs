@@ -1933,6 +1933,8 @@ namespace FamiStudio
                     {
                         var newPattern = CreateUniquePatternClone(pattern, channel);
                         channel.PatternInstances[j] = newPattern;
+                        
+                        patternRefCounts[pattern]--;
                     }
                 }
             }
