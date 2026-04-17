@@ -1735,7 +1735,7 @@ namespace FamiStudio
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x2c, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x2C, 4)) & 0xFFFFFFF) / 8000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x10, 4)) > 0)
-                    clockMultiplier[ExpansionType.Vrc7] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x10, 4)) / 3579545;
+                    clockMultiplier[ExpansionType.Vrc7] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x10, 4)) & 0xFFFFFFF) / 3579545;
 
                 if (ym2149AsEpsm)
                 {
