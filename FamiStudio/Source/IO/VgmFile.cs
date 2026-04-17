@@ -546,6 +546,7 @@ namespace FamiStudio
         byte[] dpcmData = new byte[0xffff];
         byte[] pcmRAMData = new byte[0xffffff];
         bool ym2149AsEPSM;
+        bool ym2203LowClockFix;
         int[] fdsModulationTable = new int[0x40];
         int[] NOISE_FREQ_TABLE = new[] {0x004,0x008,0x010,0x020,0x040,0x060,0x080,0x0A0,0x0CA,0x0FE,0x17C,0x1FC,0x2FA,0x3F8,0x7F2,0xFE4 };
         float[] clockMultiplier = new float[ExpansionType.Count];
@@ -1487,10 +1488,23 @@ namespace FamiStudio
                     instrument = GetDutyInstrument(channel, 0);
                 }
 
-                if(channel.IsEPSMFmChannel || channel.IsVrc7Channel)
+                // HACK: Below are workarounds for 1.5MHz YM2203 files. Not a fan of this "fix".
+                // TODO: Fix this properly.
+                if (channel.IsEPSMFmChannel || channel.IsVrc7Channel)
+                {
                     period = (int)(period * clockMultiplier[channel.Expansion]);
-                else if(!channel.IsEPSMRythmChannel)
+
+                    if (ym2203LowClockFix)
+                        period *= 3;
+                }
+                else if (!channel.IsEPSMRythmChannel)
+                {
                     period = (int)(period / clockMultiplier[channel.Expansion]);
+
+                    if (ym2203LowClockFix)
+                        period /= 4;
+                }
+
                 if(ym2149AsEPSM && channel.IsEPSMSquareChannel)
                     period = (int)(period / clockMultiplier[ExpansionType.S5B]);
 
@@ -1703,12 +1717,17 @@ namespace FamiStudio
 #endif
             var vgmData = new ReadOnlySpan<byte>();
             var vgmCommand = vgmFile[vgmDataOffset];
+            
             if (adjustClock)
             {
                 if (BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) > 0)
                     clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? NesApu.FreqNtsc : (float)894886.5);
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x44, 4)) > 0)
-                    clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF) / 4000000;
+                {
+                    var clock = BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF;
+                    clockMultiplier[ExpansionType.EPSM] = clock / 4000000.0f;
+                    ym2203LowClockFix = clock == 1500000;
+                }
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x48, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x48, 4)) & 0xFFFFFFF) / 8000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x4C, 4)) > 0)
