@@ -549,6 +549,9 @@ namespace FamiStudio
         int[] fdsModulationTable = new int[0x40];
         int[] NOISE_FREQ_TABLE = new[] {0x004,0x008,0x010,0x020,0x040,0x060,0x080,0x0A0,0x0CA,0x0FE,0x17C,0x1FC,0x2FA,0x3F8,0x7F2,0xFE4 };
         float[] clockMultiplier = new float[ExpansionType.Count];
+        int clockDivider = 0;
+        int[] clockDividerFM = new[] { 1,2,3 }; // default is 1/6, other options are 1/3 and 1/2
+        int[] clockDividerPulse = new[] { 1, 2, 4 }; // default is 1/4, other options are 1/2 and 1/1
 
         class ChannelState
         {
@@ -1429,7 +1432,7 @@ namespace FamiStudio
                 else if (channel.Type >= ChannelType.S5BSquare1 && channel.Type <= ChannelType.S5BSquare3)
                 {
                     var mixer = (int)GetState(channel.Type, NotSoFatso.STATE_S5BMIXER, 0);
-                    var noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[channel.Expansion], 1, 31);
+                    var noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]), 1, 31);
                     var envEnabled = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVENABLED, 0) != 0;
                     var envShape = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVSHAPE, 0);
                     var envTrigger = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVTRIGGER, 0);
@@ -1464,9 +1467,9 @@ namespace FamiStudio
                         var mixer = (int)GetState(channel.Type, NotSoFatso.STATE_S5BMIXER, 0);
                         int noiseFreq;
                         if (ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[ExpansionType.S5B], 1, 31);
+                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]), 1, 31);
                         else
-                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[channel.Expansion], 1, 31);
+                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]), 1, 31);
                         var envEnabled = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVENABLED, 0) != 0;
                         var envShape = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVSHAPE, 0);
                         var envTrigger = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVTRIGGER, 0);
@@ -1488,11 +1491,11 @@ namespace FamiStudio
                 }
 
                 if (channel.IsEPSMFmChannel || channel.IsVrc7Channel)
-                    period = (int)(period * clockMultiplier[channel.Expansion]);
+                    period = (int)(period * clockMultiplier[channel.Expansion] * clockDividerFM[clockDivider]);
                 else if (!channel.IsEPSMRythmChannel)
-                    period = (int)(period / clockMultiplier[channel.Expansion]);
+                    period = (int)(period / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]));
                 if(ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                    period = (int)(period / clockMultiplier[ExpansionType.S5B]);
+                    period = (int)(period / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]));
 
                 var hasNoteWithAttack = false;
 
@@ -1525,7 +1528,7 @@ namespace FamiStudio
                             
                             if (hasOctave)
                             {
-                                while (period <= noteTable[1] && octave > 0)
+                                while(period < noteTable[1] && octave != 0)
                                 {
                                     octave--;
                                     period *= 2;
@@ -1607,9 +1610,9 @@ namespace FamiStudio
 
                     // All envelope frequency will be on square 1.
                     if (ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                        envFreq = (int)(envFreq / clockMultiplier[ExpansionType.S5B]);
+                        envFreq = (int)(envFreq / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]));
                     else
-                        envFreq = (int)(envFreq / clockMultiplier[channel.Expansion]);
+                        envFreq = (int)(envFreq / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]));
 
                     // All envelope frequency will be on square 1.
                     if (state.s5bEnvFreq != envFreq || hasNoteWithAttack && envEnabled)
@@ -1782,10 +1785,7 @@ namespace FamiStudio
                 if (BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) > 0)
                     clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / ((pal ? NesApu.FreqPal : NesApu.FreqNtsc) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? 1 : 2));
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x44, 4)) > 0)
-                {
-                    var bClock = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF);
-                    clockMultiplier[ExpansionType.EPSM] = bClock / (bClock == 1500000 ? 1333333 : 4000000);
-                }
+                    clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF) / 4000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x48, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x48, 4)) & 0xFFFFFFF) / 8000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x4C, 4)) > 0)
@@ -2296,6 +2296,18 @@ namespace FamiStudio
                                 }
                                 epsmFmEnabled[5] = (vgmData[2] & 0xf0) > 0 ? 1 : 0;
                             }
+                        }
+                        else if (vgmData[1] == 0x2d)
+                        {
+                            clockDivider = 0;
+                        }
+                        else if (vgmData[1] == 0x2e)
+                        {
+                            clockDivider = 1;
+                        }
+                        else if (vgmData[1] == 0x2f)
+                        {
+                            clockDivider = 2;
                         }
                         else if (vgmData[1] >= 0x30 && vgmData[1] <= 0x4F)
                             epsmRegisterLo[vgmData[1]] = vgmData[2] & 0x7f;
