@@ -882,6 +882,12 @@ namespace FamiStudio
                 }
                 else if (instrument.IsN163)
                 {
+                    if (instrument.N163WaveSize > 32) 
+                    {
+                        uniqueWarnings.Add($"N163 Instrument \"{instrument.Name}\" wave size ({instrument.N163WaveSize}) is bigger than the maximum allowed (32). Truncating.");
+                        instrument.N163WaveSize = 32;
+                    }
+
                     instrument.PerformPostLoadActions(); // Safety.
                     instrument.BuildWaveformsAndWaveIndexEnvelope(out var waves, out var wavIndexEnv, false);
 
