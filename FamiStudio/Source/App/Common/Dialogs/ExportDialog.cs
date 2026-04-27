@@ -280,7 +280,7 @@ namespace FamiStudio
         private readonly string[] nsfFormats = ["NSF", "NSFe"];
 
         // ROM / NSF Export Strings
-        private readonly string[] romFdsTypes = ["NES ROM", "FDS Disk"];
+        private string[] romFdsTypes;
         private readonly string[] romFdsModes = ["NTSC", "PAL"];
 
         // VGM Export Strings
@@ -297,6 +297,9 @@ namespace FamiStudio
             
             app = win.FamiStudio;
             project = app.Project;
+
+            // Dropdown lists that need to be localised.
+            romFdsTypes = [FormatRomMessage, FormatFdsMessage];
 
             // Make copies of some current grid settings to work on.
             // NOTE: These need to be initialised before the dialog.
