@@ -280,7 +280,7 @@ namespace FamiStudio
         private readonly string[] nsfFormats = ["NSF", "NSFe"];
 
         // ROM / NSF Export Strings
-        private string[] romFdsTypes;
+        private readonly string[] romFdsTypes;
         private readonly string[] romFdsModes = ["NTSC", "PAL"];
 
         // VGM Export Strings
