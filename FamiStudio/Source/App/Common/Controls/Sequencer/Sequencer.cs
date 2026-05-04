@@ -2002,7 +2002,7 @@ namespace FamiStudio
                 {
                     // TODO: Add the correct icon to make unique rather than the merge one.
                     if (UpdateSelectedPatternRefCounts())
-                        menu.Insert(1, new ContextMenuOption("MenuInstance", MakePatternsUniqueLabel, () => { MakeSelectedPatternsUnique(); }));
+                        menu.Insert(1, new ContextMenuOption("MenuUnlink", MakePatternsUniqueLabel, () => { MakeSelectedPatternsUnique(); }));
                 }
 
                 if (menu.Count > 0)
