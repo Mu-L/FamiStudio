@@ -1609,7 +1609,7 @@ namespace FamiStudio
         {
             if (propIdx == 6 && click == ClickType.Button)
             {
-                Platform.MessageBoxAsync(dialog.ParentWindow, ResetMessage.Format(ExportFormatNames[3]), ResetTitle, MessageBoxButtons.YesNo, (r) =>
+                Platform.MessageBoxAsync(dialog.ParentWindow, ResetMessage.Format(ExportFormatNames[4]), ResetTitle, MessageBoxButtons.YesNo, (r) =>
                 {
                     if (r == DialogResult.Yes)
                     {
@@ -1760,7 +1760,7 @@ namespace FamiStudio
 
             if (propIdx == 9 && click == ClickType.Button)
             {
-                Platform.MessageBoxAsync(dialog.ParentWindow, ResetMessage.Format(ExportFormatNames[3]), ResetTitle, MessageBoxButtons.YesNo, (r) =>
+                Platform.MessageBoxAsync(dialog.ParentWindow, ResetMessage.Format(ExportFormatNames[5]), ResetTitle, MessageBoxButtons.YesNo, (r) =>
                 {
                     if (r == DialogResult.Yes)
                     {
