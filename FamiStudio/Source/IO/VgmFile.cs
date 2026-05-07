@@ -1694,6 +1694,7 @@ namespace FamiStudio
             song.SetDefaultPatternLength(patternLength);
             var p = 0;
             var n = 0;
+            apuRegister[0x15] = 0x0F; // Enable squares, triangle, and noise by default.
             channelStates = new ChannelState[50];
             for (int i = 0; i < song.Channels.Length; i++)
                 channelStates[i] = new ChannelState();
@@ -1723,61 +1724,73 @@ namespace FamiStudio
                 pal = true;
                 project.PalMode = pal;
             }
-            else while (vgmDataOffset < vgmFile.Length)
+            else 
             {
-                if (vgmCommand == 0x67)  //DataBlock
+                var ntscCount = 0;
+                var palCount  = 0;
+                while (vgmDataOffset < vgmFile.Length)
                 {
-                    var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
-                    vgmDataOffset = vgmDataOffset + dataSize + 7;
-                }
-                else if (vgmCommand == 0x68)
-                    vgmDataOffset = vgmDataOffset + 12;
-                else if (vgmCommand == 0x66)
-                {
-                    vgmDataOffset = vgmDataOffset + 1;
-                    break;
-                }
-
-                else if (vgmCommand == 0x61 || vgmCommand == 0x63 || vgmCommand == 0x62 || (vgmCommand >= 0x70 && vgmCommand <= 0x8f))
-                {
-                    if (vgmCommand == 0x63)
+                    if (vgmCommand == 0x67)  //DataBlock
+                    {
+                        var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
+                        vgmDataOffset = vgmDataOffset + dataSize + 7;
+                    }
+                    else if (vgmCommand == 0x68)
+                        vgmDataOffset = vgmDataOffset + 12;
+                    else if (vgmCommand == 0x66)
                     {
                         vgmDataOffset = vgmDataOffset + 1;
-                        samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
-                        samples = samplesPerFrame * 0.5;
-                        pal = true;
-                        project.PalMode = pal;
                         break;
                     }
-                    else if (vgmCommand == 0x62)
-                        vgmDataOffset = vgmDataOffset + 1;
-                    else if (vgmCommand == 0x61)
-                        vgmDataOffset = vgmDataOffset + 3;
-                    else if (vgmCommand >= 0x80)
-                        vgmDataOffset = vgmDataOffset + 1;
+
+                    else if (vgmCommand == 0x61 || vgmCommand == 0x63 || vgmCommand == 0x62 || (vgmCommand >= 0x70 && vgmCommand <= 0x8f))
+                    {
+                        if (vgmCommand == 0x63)
+                        {
+                            vgmDataOffset = vgmDataOffset + 1;
+                            palCount++;
+                        }
+                        else if (vgmCommand == 0x62)
+                        {
+                            vgmDataOffset = vgmDataOffset + 1;
+                            ntscCount++;
+                        }
+                        else if (vgmCommand == 0x61)
+                            vgmDataOffset = vgmDataOffset + 3;
+                        else if (vgmCommand >= 0x80)
+                            vgmDataOffset = vgmDataOffset + 1;
+                        else
+                            vgmDataOffset = vgmDataOffset + 1;
+                    }
+                    else if (vgmCommand == 0x4F || vgmCommand == 0x50 || vgmCommand == 0x31)
+                        vgmDataOffset = vgmDataOffset + 2;
+                    else if (vgmCommand >= 0xC0 && vgmCommand <= 0xDF)
+                        vgmDataOffset = vgmDataOffset + 4;
+                    else if (vgmCommand == 0xE0)
+                        vgmDataOffset = vgmDataOffset + 5;
+                    else if (vgmCommand >= 0x90 && vgmCommand <= 0x92)
+                        vgmDataOffset = vgmDataOffset + 6;
+                    else if (vgmCommand == 0x93)
+                        vgmDataOffset = vgmDataOffset + 11;
+                    else if (vgmCommand == 0x94)
+                        vgmDataOffset = vgmDataOffset + 2;
+                    else if (vgmCommand == 0x95)
+                        vgmDataOffset = vgmDataOffset + 5;
                     else
-                        vgmDataOffset = vgmDataOffset + 1;
+                        vgmDataOffset = vgmDataOffset + 3;
+                    if (vgmFile.Length > vgmDataOffset)
+                        vgmCommand = vgmFile[vgmDataOffset];
+                    else
+                        break;
                 }
-                else if (vgmCommand == 0x4F || vgmCommand == 0x50 || vgmCommand == 0x31)
-                    vgmDataOffset = vgmDataOffset + 2;
-                else if (vgmCommand >= 0xC0 && vgmCommand <= 0xDF)
-                    vgmDataOffset = vgmDataOffset + 4;
-                else if (vgmCommand == 0xE0)
-                    vgmDataOffset = vgmDataOffset + 5;
-                else if (vgmCommand >= 0x90 && vgmCommand <= 0x92)
-                    vgmDataOffset = vgmDataOffset + 6;
-                else if (vgmCommand == 0x93)
-                    vgmDataOffset = vgmDataOffset + 11;
-                else if (vgmCommand == 0x94)
-                    vgmDataOffset = vgmDataOffset + 2;
-                else if (vgmCommand == 0x95)
-                    vgmDataOffset = vgmDataOffset + 5;
-                else
-                    vgmDataOffset = vgmDataOffset + 3;
-                if (vgmFile.Length > vgmDataOffset)
-                    vgmCommand = vgmFile[vgmDataOffset];
-                else
-                    break;
+
+                if (palCount > ntscCount)
+                {
+                    samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
+                    samples = samplesPerFrame * 0.5;
+                    pal = true;
+                    project.PalMode = pal;
+                }
             }
 
             if (adjustClock)
@@ -1936,7 +1949,7 @@ namespace FamiStudio
                                 int reg = apuRegister[i * 4];
                                 bool sqConstant = (reg & 0x10) != 0;
                                 bool sqLoop = (reg & 0x20) != 0;
-                                int sqVolume = reg & 0x0F;
+                                int sqVolume = reg & 0x1F;
 
                                 if (!sqConstant)
                                 {
