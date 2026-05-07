@@ -1718,16 +1718,15 @@ namespace FamiStudio
             var samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqNtsc / 29780.5) : 735;
             var samples = samplesPerFrame * 0.5; // Offset starting point mid-frame for rounding reasons.
 
-            //Looping through file to check if file is PAL
+            // Check if file is PAL.
             if (rate == 50 || nesClock == NesApu.FreqPal)
             {
                 pal = true;
                 project.PalMode = pal;
             }
-            else 
+            else if (rate != 60 && nesClock != NesApu.FreqNtsc && nesClock != NesApu.FreqNtsc - 1)
             {
-                var ntscCount = 0;
-                var palCount  = 0;
+                //Looping through file to check if file is PAL
                 while (vgmDataOffset < vgmFile.Length)
                 {
                     if (vgmCommand == 0x67)  //DataBlock
@@ -1748,13 +1747,14 @@ namespace FamiStudio
                         if (vgmCommand == 0x63)
                         {
                             vgmDataOffset = vgmDataOffset + 1;
-                            palCount++;
+                            samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
+                            samples = samplesPerFrame * 0.5;
+                            pal = true;
+                            project.PalMode = pal;
+                            break;
                         }
                         else if (vgmCommand == 0x62)
-                        {
                             vgmDataOffset = vgmDataOffset + 1;
-                            ntscCount++;
-                        }
                         else if (vgmCommand == 0x61)
                             vgmDataOffset = vgmDataOffset + 3;
                         else if (vgmCommand >= 0x80)
@@ -1782,14 +1782,6 @@ namespace FamiStudio
                         vgmCommand = vgmFile[vgmDataOffset];
                     else
                         break;
-                }
-
-                if (palCount > ntscCount)
-                {
-                    samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
-                    samples = samplesPerFrame * 0.5;
-                    pal = true;
-                    project.PalMode = pal;
                 }
             }
 
