@@ -1729,7 +1729,7 @@ namespace FamiStudio
                 // Looping through file to check if file is PAL.
                 // We count waits for PAL and NTSC for edge cases,
                 // assuming the one with the higher count is correct.
-                // Note: Defaults to NTSC if counts match.
+                // Note: Defaults to PAL if counts are equal.
                 var ntscWaits = 0;
                 var palWaits  = 0;
 
@@ -1789,7 +1789,7 @@ namespace FamiStudio
                         break;
                 }
 
-                if (palWaits > ntscWaits)
+                if (palWaits >= ntscWaits)
                 {
                     samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
                     samples = samplesPerFrame * 0.5;
