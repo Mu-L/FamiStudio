@@ -1726,7 +1726,13 @@ namespace FamiStudio
             }
             else if (rate != 60 && nesClock != NesApu.FreqNtsc && nesClock != NesApu.FreqNtsc - 1)
             {
-                //Looping through file to check if file is PAL
+                // Looping through file to check if file is PAL.
+                // We count waits for PAL and NTSC for edge cases,
+                // assuming the one with the higher count is correct.
+                // Note: Defaults to NTSC if counts match.
+                var ntscWaits = 0;
+                var palWaits  = 0;
+
                 while (vgmDataOffset < vgmFile.Length)
                 {
                     if (vgmCommand == 0x67)  //DataBlock
@@ -1747,14 +1753,13 @@ namespace FamiStudio
                         if (vgmCommand == 0x63)
                         {
                             vgmDataOffset = vgmDataOffset + 1;
-                            samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
-                            samples = samplesPerFrame * 0.5;
-                            pal = true;
-                            project.PalMode = pal;
-                            break;
+                            palWaits++;
                         }
                         else if (vgmCommand == 0x62)
+                        {
                             vgmDataOffset = vgmDataOffset + 1;
+                            ntscWaits++;
+                        }
                         else if (vgmCommand == 0x61)
                             vgmDataOffset = vgmDataOffset + 3;
                         else if (vgmCommand >= 0x80)
@@ -1782,6 +1787,14 @@ namespace FamiStudio
                         vgmCommand = vgmFile[vgmDataOffset];
                     else
                         break;
+                }
+
+                if (palWaits > ntscWaits)
+                {
+                    samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
+                    samples = samplesPerFrame * 0.5;
+                    pal = true;
+                    project.PalMode = pal;
                 }
             }
 
