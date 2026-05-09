@@ -449,8 +449,9 @@ namespace FamiStudio
                         new ColumnDesc(PanColumn, 0.6f, 0, 100, (o) => FormattableString.Invariant($"{(int)o} %")) 
                     }, GetDefaultChannelsGridData(false, false, app.SelectedSong, out _), 7, ChannelGridTooltip); // 11
                     page.AddButton(null, ResetDefaultsLabel.Format(FormatAudioMessage.ToString().ToLowerInvariant())); // 12
-                    page.SetPropertyEnabled( 3, false);
-                    page.SetPropertyEnabled( 6, false);
+                    page.SetPropertyEnabled( 3, audioSettings.Format == "MP3" || audioSettings.Format == "Ogg Vorbis");
+                    page.SetPropertyEnabled( 5, audioSettings.LoopMode == LoopNTimesOption);
+                    page.SetPropertyEnabled( 6, audioSettings.LoopMode == DurationOption);
                     page.SetPropertyVisible( 8, Platform.IsDesktop); // No separate files on mobile.
                     page.SetPropertyVisible( 9, Platform.IsDesktop); // No separate intro on mobile.
                     page.SetPropertyEnabled(10, !project.OutputsStereoAudio); // Force stereo for EPSM.
@@ -1015,6 +1016,7 @@ namespace FamiStudio
                     var exportSettings = project.AudioExportConfig;
 
                     exportSettings.SongId        = song.Id;
+                    exportSettings.Format        = props.GetPropertyValue<string>(1);
                     exportSettings.SampleRate    = props.GetPropertyValue<string>(2);
                     exportSettings.BitRate       = props.GetPropertyValue<string>(3);
                     exportSettings.LoopMode      = loopMode;
