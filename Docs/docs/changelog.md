@@ -4,6 +4,18 @@ Version history / release notes for each release.
 
 To download older versions or view the release dates, please visit the [Github Releases](https://github.com/BleuBleu/FamiStudio/releases) page.
 
+## Version 4.5.0
+
+This release, like the previous one, was primarily handled by Steo. Many thanks for their continued effort. This will likely remain the case for the foreseeable future while I focus on other projects
+
+* Added option to disable attack on DPCM, this will ignore initial DMC value
+* Added option to use DPCM sample colours in oscilloscope video export 
+* Added option to import initial DMC values for NSF
+* Added scales to the piano roll context menu, right-click / long press an empty area to access
+* Added double click/tap in project explorer to open their properties
+* Added saving project export settings for each mode
+* Added DMC initial values to text export
+
 ## Version 4.4.4 (Hotfix)
 
 Changes/Fixes:
