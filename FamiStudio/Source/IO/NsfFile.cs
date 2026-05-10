@@ -643,6 +643,7 @@ namespace FamiStudio
                     {
                         var instrument = project.CreateInstrument(ExpansionType.Vrc7, name);
                         instrument.Vrc7Patch = patch;
+                        instrument.Vrc7OverrideRelease = sustain;
                         Array.Copy(patchRegs, instrument.Vrc7PatchRegs, 8);
                         return instrument;
                     }
