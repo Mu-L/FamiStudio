@@ -4,9 +4,27 @@ Version history / release notes for each release.
 
 To download older versions or view the release dates, please visit the [Github Releases](https://github.com/BleuBleu/FamiStudio/releases) page.
 
+## Version 4.5.1 (Hotfix)
+
+This release was 100% handled by Steo, I'm just publishing it. Thanks!!
+
+Changes/Fixes:
+
+* Fixed several VGM issues (incorporated some from Perkka too)
+* Current song is now selected by default in export dialog
+* Added VRC7 sustain bit (override release) in NSF
+* Added sub-menus for context menus and moved scale options to them
+* Added option for dim unsupported channels
+* Added option to make selected patterns unique (icons should follow in a major release)
+* Fixed issue with N163 loop / release points on import (bug introduced in 4.5.0)
+* Fixed FamiTracker N163 export issues (chunk length and truncate to 32)
+* Fixed some export dialog localisation errors
+
 ## Version 4.5.0
 
 This release, like the previous one, was primarily handled by Steo. Many thanks for their continued effort. This will likely remain the case for the foreseeable future while I focus on other projects
+
+Changes/Fixes:
 
 * Added option to disable attack on DPCM, this will ignore initial DMC value
 * Added option to use DPCM sample colours in oscilloscope video export 
