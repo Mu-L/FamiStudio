@@ -138,33 +138,31 @@ namespace FamiStudio
                 header.version = 0x170;
                 uint NESClock;
                 byte waitCommand;
-                int samplesPerFrame;
-
+                double samplesPerFrame;
 
                 if (project.PalMode)
                 {
                     header.rate = 50;
-                    NESClock = 1662607;
+                    NESClock = NesApu.FreqPal;
                     waitCommand = 0x63;
-                    samplesPerFrame = 882;
+                    samplesPerFrame = 44100.0 / (NesApu.FreqPal / 33247.5);
                 }
                 else
                 {
                     header.rate = 60;
-                    NESClock = 1789772;
+                    NESClock = NesApu.FreqNtsc - 1; // No idea why this is 1789772, but the VGM specs mention this value.
                     waitCommand = 0x62;
-                    samplesPerFrame = 735;
+                    samplesPerFrame = 44100.0 / (NesApu.FreqNtsc / 29780.5);
                 }
 
-                int maxFramesPerWaitCommand = 65535 / samplesPerFrame;
+                int maxFramesPerWaitCommand = (int)Math.Round(65535 / samplesPerFrame);
 
-                header.totalSamples = TotalLength * samplesPerFrame;
+                header.totalSamples = (int)Math.Round(TotalLength * samplesPerFrame);
                 // The clock values are purely theoretical for expansions in PAL.
                 if (project.UsesVrc7Expansion) header.ym2413clock = 3579545 | 0x80000000;
 
                 if (project.UsesFdsExpansion) header.NESAPUclock = NESClock | 0x80000000;
                 else header.NESAPUclock = NESClock;
-
 
                 if (project.UsesS5BExpansion)
                 {
@@ -247,7 +245,7 @@ namespace FamiStudio
                 {
                     header.loopBase = loopsTwice ? (byte)1 : (byte)0;
                     header.loopModifier = 0x10;
-                    header.loopSamples = (TotalLength - IntroLength) * samplesPerFrame;
+                    header.loopSamples = (int)Math.Round((TotalLength - IntroLength) * samplesPerFrame);
                 }
                 else
                 {
@@ -346,7 +344,6 @@ namespace FamiStudio
                         {
                             if (IntroLength <= frameNumber || IntroLength >= reg.FrameNumber || IntroLength >= frameNumber + maxFramesPerWaitCommand)
                             {
-
                                 writer.Write((byte)0x61);
                                 writer.Write((short)(Utils.Clamp(reg.FrameNumber - frameNumber, 3, maxFramesPerWaitCommand) * samplesPerFrame));
                                 frameNumber += Utils.Clamp(reg.FrameNumber - frameNumber, 3, maxFramesPerWaitCommand);
@@ -486,14 +483,52 @@ namespace FamiStudio
         private bool importDmcValues;
         private readonly int[] DPCMOctaveOrder = new[] { 4, 5, 3, 6, 2, 7, 1, 0 };
 
-        // For 2A03 DPCM notes with / without attack + DMC initial values.
-        readonly List<int> framesWithDeltaWrites = [];
+        // For 2A03 DMC initial values.
         readonly List<int> sampleIdsInitialSet = [];
+        bool deltaWriteThisFrame;
 
+        // 2A03 / 2A07 counters.
+        static readonly int[] LengthCounterTable =
+        {
+            10, 254, 20,  2, 40,  4, 80,  6,
+            160, 8, 60, 10, 14, 12, 26, 14,
+            12, 16, 24, 18, 48, 20, 96, 22,
+            192,24, 72, 26, 16, 28, 32, 30
+        };
+
+        static readonly int[] DmcRateTableNtsc =
+        {
+            428, 380, 340, 320, 286, 254, 226, 214,
+            190, 160, 142, 128, 106,  85,  72,  54
+        };
+
+        static readonly int[] DmcRateTablePal =
+        {
+            398, 354, 316, 298, 276, 236, 210, 198,
+            176, 148, 132, 118,  98,  78,  66,  50
+        };
+
+        float apuQuarterFrameClockRemainder;
+        readonly int[] apuSquareLengthCounter = new int[2];
+        readonly bool[] apuSquareLengthEnabled = new bool[2];
+        int apuTriangleLengthCounter;
+        bool apuTriangleLengthEnabled;
+        int apuTriangleLinearCounter;
+        int  apuTriangleLinearReloadValue;
+        bool apuTriangleLinearReloadFlag;
+        bool apuTriangleControlFlag;
+        int apuNoiseLengthCounter;
+        bool apuNoiseLengthEnabled;
+        bool apuDmcActive;
+        bool apuDmcLoop;
+        int  apuDmcBytesRemaining;
+        double apuDmcByteRemainder;
+        double apuDmcBytesPerFrame;
+
+        // Registers.
         int[] apuRegister = new int[0x100];
         int[] apuDecayVolume = new int[0x4];
         int[] apuDecayCounter = new int[0x4];
-        float[] apuSubTickCounter = new float[0x4];
         int[] apuSweepPitchOffset = new int[0x2];
         bool isFiveStep;
         int[] vrc7Register = new int[0x100];
@@ -514,6 +549,9 @@ namespace FamiStudio
         int[] fdsModulationTable = new int[0x40];
         int[] NOISE_FREQ_TABLE = new[] {0x004,0x008,0x010,0x020,0x040,0x060,0x080,0x0A0,0x0CA,0x0FE,0x17C,0x1FC,0x2FA,0x3F8,0x7F2,0xFE4 };
         float[] clockMultiplier = new float[ExpansionType.Count];
+        int clockDivider = 0;
+        int[] clockDividerFM = new[] { 1,2,3 }; // default is 1/6, other options are 1/3 and 1/2
+        int[] clockDividerPulse = new[] { 1, 2, 4 }; // default is 1/4, other options are 1/2 and 1/1
 
         class ChannelState
         {
@@ -612,7 +650,7 @@ namespace FamiStudio
             }
         }
 
-        private Instrument GetVrc7Instrument(byte patch, byte[] patchRegs)
+        private Instrument GetVrc7Instrument(byte patch, byte[] patchRegs, bool sustain)
         {
             if (patch == Vrc7InstrumentPatch.Custom)
             {
@@ -634,6 +672,8 @@ namespace FamiStudio
                         var instrument = project.CreateInstrument(ExpansionType.Vrc7, name);
                         instrument.Vrc7Patch = patch;
                         Array.Copy(patchRegs, instrument.Vrc7PatchRegs, 8);
+                        instrument.Vrc7OverrideRelease = sustain;
+
                         return instrument;
                     }
                 }
@@ -834,7 +874,14 @@ namespace FamiStudio
                             case NotSoFatso.STATE_PERIOD: return (int)apuRegister[2 + (channel * 4)] + (int)((apuRegister[3 + (channel * 4)] & 0x7) << 8);
                             case NotSoFatso.STATE_DUTYCYCLE: return (int)(apuRegister[(channel * 4)] & 0xc0) >> 6;
                             //case NotSoFatso.STATE_VOLUME: return mWave_Squares.nLengthCount[channel] && mWave_Squares.bChannelEnabled[channel] ? mWave_Squares.nVolume[channel] : 0;
-                            case NotSoFatso.STATE_VOLUME: return (apuRegister[(channel * 4)] & 0xf);
+                            case NotSoFatso.STATE_VOLUME:
+                            {
+                                int reg = apuRegister[channel * 4];
+                                bool constant = (reg & 0x10) != 0;
+                                int volume = reg & 0x0F;
+
+                                return constant ? volume : apuDecayVolume[channel];
+                            }
                         }
                         break;
                     }
@@ -844,57 +891,35 @@ namespace FamiStudio
                         {
                             case NotSoFatso.STATE_PERIOD: return (int)apuRegister[2 + (channel * 4)] + (int)((apuRegister[3 + (channel * 4)] & 0x7) << 8);
                             //case NotSoFatso.STATE_VOLUME: return mWave_TND.nTriLengthCount && mWave_TND.bTriChannelEnabled ? mWave_TND.nTriLinearCount : 0;
-                            case NotSoFatso.STATE_VOLUME: return (apuRegister[(channel * 4)] & 0xf);
+                            case NotSoFatso.STATE_VOLUME:
+                            {
+                                bool enabled = (apuRegister[0x15] & 0x04) != 0;
+                                bool active  = enabled && apuTriangleLengthCounter > 0 && apuTriangleLinearCounter > 0;
+                                return active ? 15 : 0;
+                            }
                         }
                         break;
                     }
-                case ChannelType.Noise:
-                    {
-                        switch (state)
+                        case ChannelType.Noise:
                         {
+                            switch (state)
+                            {
                             case NotSoFatso.STATE_VOLUME:
-                                {
-                                    var reg400C  = apuRegister[0x0C];
-                                    var constant = (reg400C & 0x10) != 0;
-                                    var loop     = (reg400C & 0x20) != 0;
-                                    var volume   =  reg400C & 0x0F;
-                                    var stepSize = isFiveStep ? 3.2f : 4.0f;
+                            {
+                                if ((apuRegister[0x15] & 0x08) == 0 || apuNoiseLengthCounter < 0)
+                                    return 0;
 
-                                    if (!constant)
-                                    {
-                                        // Multiple steps to simulate 192Hz or 240Hz.
-                                        apuSubTickCounter[channel] += stepSize;
+                                var reg400C  = apuRegister[0x0C];
+                                var constant = (reg400C & 0x10) != 0;
+                                var volume   = reg400C & 0x0F;
 
-                                        while (apuSubTickCounter[channel] >= stepSize)
-                                        {
-                                            apuSubTickCounter[channel] -= 1.0f;
+                                return constant ? volume : apuDecayVolume[channel];
+                            }
 
-                                            if (apuDecayCounter[channel] > 0)
-                                                apuDecayCounter[channel]--;
-                                            else
-                                            {
-                                                apuDecayCounter[channel] = volume;
-
-                                                if (apuDecayVolume[channel] > 0)
-                                                    apuDecayVolume[channel]--;
-                                                else if (loop)
-                                                    apuDecayVolume[channel] = 15;
-                                            }
-                                        }
-
-                                        return apuDecayVolume[channel];
-                                    }
-                                    else
-                                    {
-                                        return volume;
-                                    }
-                                }
-
-                            //case NotSoFatso.STATE_VOLUME: return mWave_TND.nNoiseLengthCount && mWave_TND.bNoiseChannelEnabled ? mWave_TND.nNoiseVolume : 0;
                             case NotSoFatso.STATE_DUTYCYCLE: return (apuRegister[0x0e] & 0x80) >> 8;
                             case NotSoFatso.STATE_PERIOD: return apuRegister[0x0e] & 0xf;
-                        }
-                        break;
+                            }
+                            break;
                     }
                 case ChannelType.Dpcm:
                     {
@@ -938,7 +963,7 @@ namespace FamiStudio
                                 }
                             case NotSoFatso.STATE_DPCMACTIVE:
                                 {
-                                    return apuRegister[0x15] & 0x10;
+                                    return apuDmcActive ? 1 : 0;
                                 }
                         }
                         break;
@@ -1159,7 +1184,11 @@ namespace FamiStudio
                     // frame, use the current DMC value as the sample's DMC initial value. Notes with no attack
                     // could potentially lead to missing the DMC initial value otherwise.
                     var frame = song.GetPatternStartAbsoluteNoteIndex(p, n);
-                    var attack = framesWithDeltaWrites.Contains(frame);
+                    var attack = deltaWriteThisFrame;
+
+                    if (deltaWriteThisFrame)
+                        deltaWriteThisFrame = false;
+
                     if (importDmcValues && !sampleIdsInitialSet.Contains(sample.Id) && attack)
                     {
                         sample.DmcInitialValueDiv2 = dmc / 2;
@@ -1389,6 +1418,7 @@ namespace FamiStudio
                          channel.Type <= ChannelType.Vrc7Fm6)
                 {
                     var patch = (byte)GetState(channel.Type, NotSoFatso.STATE_VRC7PATCH, 0);
+                    var sustain = GetState(channel.Type, NotSoFatso.STATE_FMSUSTAIN, 0) > 0;
                     var regs = new byte[8];
 
                     if (patch == 0)
@@ -1397,12 +1427,12 @@ namespace FamiStudio
                             regs[i] = (byte)GetState(channel.Type, NotSoFatso.STATE_FMPATCHREG, i);
                     }
 
-                    instrument = GetVrc7Instrument(patch, regs);
+                    instrument = GetVrc7Instrument(patch, regs, sustain);
                 }
                 else if (channel.Type >= ChannelType.S5BSquare1 && channel.Type <= ChannelType.S5BSquare3)
                 {
                     var mixer = (int)GetState(channel.Type, NotSoFatso.STATE_S5BMIXER, 0);
-                    var noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[channel.Expansion], 1, 31);
+                    var noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]), 1, 31);
                     var envEnabled = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVENABLED, 0) != 0;
                     var envShape = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVSHAPE, 0);
                     var envTrigger = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVTRIGGER, 0);
@@ -1437,9 +1467,9 @@ namespace FamiStudio
                         var mixer = (int)GetState(channel.Type, NotSoFatso.STATE_S5BMIXER, 0);
                         int noiseFreq;
                         if (ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[ExpansionType.S5B], 1, 31);
+                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]), 1, 31);
                         else
-                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / clockMultiplier[channel.Expansion], 1, 31);
+                            noiseFreq = (byte)Utils.Clamp((GetState(channel.Type, NotSoFatso.STATE_S5BNOISEFREQUENCY, 0) & 0x1f) / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]), 1, 31);
                         var envEnabled = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVENABLED, 0) != 0;
                         var envShape = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVSHAPE, 0);
                         var envTrigger = (int)GetState(channel.Type, NotSoFatso.STATE_S5BENVTRIGGER, 0);
@@ -1460,54 +1490,24 @@ namespace FamiStudio
                     instrument = GetDutyInstrument(channel, 0);
                 }
 
-                if(channel.IsEPSMFmChannel || channel.IsVrc7Channel)
-                    period = (int)(period * clockMultiplier[channel.Expansion]);
-                else if(!channel.IsEPSMRythmChannel)
-                    period = (int)(period / clockMultiplier[channel.Expansion]);
+                if (channel.IsEPSMFmChannel || channel.IsVrc7Channel)
+                    period = (int)(period * clockMultiplier[channel.Expansion] * clockDividerFM[clockDivider]);
+                else if (!channel.IsEPSMRythmChannel)
+                    period = (int)(period / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]));
                 if(ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                    period = (int)(period / clockMultiplier[ExpansionType.S5B]);
+                    period = (int)(period / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]));
 
                 var hasNoteWithAttack = false;
 
-                // 2A03 sweep.
                 if (channel.Type == ChannelType.Square1 || channel.Type == ChannelType.Square2)
                 {
                     var ch = channel.Index;
-                    var offset = ch == 0 ? 0x01 : 0x05;
-                    var sweepReg = apuRegister[offset];
+                    var target = period + apuSweepPitchOffset[ch];
 
-                    var sweepEnable = (sweepReg & 0x80) != 0;
-                    var sweepShift  =  sweepReg & 0x07;
-                    var sweepTimer  = (sweepReg & 0x70) >> 4;
-                    var sweepNegate = (sweepReg & 0x08) != 0;
-                    var stepSize    = (sweepTimer + 1) * (isFiveStep ? 1.6f : 2.0f);
-
-                    if (sweepEnable && sweepShift != 0)
-                    {
-                        apuSubTickCounter[ch] += stepSize;
-
-                        while (apuSubTickCounter[ch] >= 1.0f)
-                        {
-                            apuSubTickCounter[ch] -= 1.0f;
-
-                            var sweepDelta = (period + apuSweepPitchOffset[ch]) >> sweepShift;
-
-                            if (sweepNegate)
-                                sweepDelta = (ch == 0) ? -sweepDelta - 1 : -sweepDelta;
-
-                            apuSweepPitchOffset[ch] += sweepDelta;
-                        }
-
-                        var target = period + apuSweepPitchOffset[ch];
-                        if (target >= 8 && target <= 0x7FF)
-                            period = target;
-                        else
-                            state.volume = 0;
-                    }
+                    if (target >= 8 && target <= 0x7FF)
+                        period = target;
                     else
-                    {
-                        apuSweepPitchOffset[ch] = 0;
-                    }
+                        state.volume = 0;
                 }
 
                 if ((state.period != period) || (hasOctave && state.octave != octave) || (instrument != state.instrument) || force)
@@ -1526,10 +1526,19 @@ namespace FamiStudio
                             if (channel.IsS5BChannel)
                                 period -= 1;
                             
-                            if(period < noteTable[1] && octave != 0)
+                            if (hasOctave)
                             {
-                                octave--;
-                                period *= 2;
+                                while(period < noteTable[1] && octave != 0)
+                                {
+                                    octave--;
+                                    period *= 2;
+                                }
+
+                                while (period > noteTable[^2] && octave < 7)
+                                {
+                                    octave++;
+                                    period /= 2;
+                                }
                             }
 
                             note = (byte)GetBestMatchingNote(period, noteTable, out finePitch);
@@ -1601,9 +1610,9 @@ namespace FamiStudio
 
                     // All envelope frequency will be on square 1.
                     if (ym2149AsEPSM && channel.IsEPSMSquareChannel)
-                        envFreq = (int)(envFreq / clockMultiplier[ExpansionType.S5B]);
+                        envFreq = (int)(envFreq / (clockMultiplier[ExpansionType.S5B] * clockDividerPulse[clockDivider]));
                     else
-                        envFreq = (int)(envFreq / clockMultiplier[channel.Expansion]);
+                        envFreq = (int)(envFreq / (clockMultiplier[channel.Expansion] * clockDividerPulse[clockDivider]));
 
                     // All envelope frequency will be on square 1.
                     if (state.s5bEnvFreq != envFreq || hasNoteWithAttack && envEnabled)
@@ -1657,7 +1666,7 @@ namespace FamiStudio
          * Add Possibility to import second 2A03 Squares as MMC5
          * 
          */
-        public Project Load(string filename, int patternLength, int frameSkip, bool adjustClock, bool reverseDpcm, bool preserveDpcmPad, bool importDmcVals, bool ym2149AsEpsm, int tuning = 440)
+        public Project Load(string filename, int patternLength, int frameSkip, bool adjustClock, bool reverseDpcm, bool preserveDpcmPad, bool importDmcVals, bool ym2149AsEpsm, bool framePacing, int tuning = 440)
         {
             var vgmFile = System.IO.File.ReadAllBytes(filename);
             if (filename.EndsWith(".vgz"))
@@ -1685,6 +1694,7 @@ namespace FamiStudio
             song.SetDefaultPatternLength(patternLength);
             var p = 0;
             var n = 0;
+            apuRegister[0x15] = 0x0F; // Enable squares, triangle, and noise by default.
             channelStates = new ChannelState[50];
             for (int i = 0; i < song.Channels.Length; i++)
                 channelStates[i] = new ChannelState();
@@ -1697,10 +1707,101 @@ namespace FamiStudio
 #endif
             var vgmData = new ReadOnlySpan<byte>();
             var vgmCommand = vgmFile[vgmDataOffset];
+            
+            int rate = BitConverter.ToInt32(vgmFile, 0x24);
+            uint nesClock = BitConverter.ToUInt32(vgmFile, 0x84) & 0x7FFFFFFF;
+
+            var chipCommands = 0;
+            var unknownChipCommands = 0;
+            var frame = 0;
+            int expansionMask = 0;
+            var samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqNtsc / 29780.5) : 735;
+            var samples = samplesPerFrame * 0.5; // Offset starting point mid-frame for rounding reasons.
+
+            // Check if file is PAL.
+            if (rate == 50 || nesClock == NesApu.FreqPal)
+            {
+                pal = true;
+                project.PalMode = pal;
+            }
+            else if (rate != 60 && nesClock != NesApu.FreqNtsc && nesClock != NesApu.FreqNtsc - 1)
+            {
+                // Looping through file to check if file is PAL.
+                // We count waits for PAL and NTSC for edge cases,
+                // assuming the one with the higher count is correct.
+                // Note: Defaults to PAL if counts are equal.
+                var ntscWaits = 0;
+                var palWaits  = 0;
+
+                while (vgmDataOffset < vgmFile.Length)
+                {
+                    if (vgmCommand == 0x67)  //DataBlock
+                    {
+                        var dataSize  = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
+                        vgmDataOffset = vgmDataOffset + dataSize + 7;
+                    }
+                    else if (vgmCommand == 0x68)
+                        vgmDataOffset = vgmDataOffset + 12;
+                    else if (vgmCommand == 0x66)
+                    {
+                        vgmDataOffset = vgmDataOffset + 1;
+                        break;
+                    }
+
+                    else if (vgmCommand == 0x61 || vgmCommand == 0x63 || vgmCommand == 0x62 || (vgmCommand >= 0x70 && vgmCommand <= 0x8f))
+                    {
+                        if (vgmCommand == 0x63)
+                        {
+                            vgmDataOffset = vgmDataOffset + 1;
+                            palWaits++;
+                        }
+                        else if (vgmCommand == 0x62)
+                        {
+                            vgmDataOffset = vgmDataOffset + 1;
+                            ntscWaits++;
+                        }
+                        else if (vgmCommand == 0x61)
+                            vgmDataOffset = vgmDataOffset + 3;
+                        else if (vgmCommand >= 0x80)
+                            vgmDataOffset = vgmDataOffset + 1;
+                        else
+                            vgmDataOffset = vgmDataOffset + 1;
+                    }
+                    else if (vgmCommand == 0x4F || vgmCommand == 0x50 || vgmCommand == 0x31)
+                        vgmDataOffset = vgmDataOffset + 2;
+                    else if (vgmCommand >= 0xC0 && vgmCommand <= 0xDF)
+                        vgmDataOffset = vgmDataOffset + 4;
+                    else if (vgmCommand == 0xE0)
+                        vgmDataOffset = vgmDataOffset + 5;
+                    else if (vgmCommand >= 0x90 && vgmCommand <= 0x92)
+                        vgmDataOffset = vgmDataOffset + 6;
+                    else if (vgmCommand == 0x93)
+                        vgmDataOffset = vgmDataOffset + 11;
+                    else if (vgmCommand == 0x94)
+                        vgmDataOffset = vgmDataOffset + 2;
+                    else if (vgmCommand == 0x95)
+                        vgmDataOffset = vgmDataOffset + 5;
+                    else
+                        vgmDataOffset = vgmDataOffset + 3;
+                    if (vgmFile.Length > vgmDataOffset)
+                        vgmCommand = vgmFile[vgmDataOffset];
+                    else
+                        break;
+                }
+
+                if (palWaits >= ntscWaits)
+                {
+                    samplesPerFrame = framePacing ? 44100.0 / (NesApu.FreqPal / 33247.5) : 882;
+                    samples = samplesPerFrame * 0.5;
+                    pal = true;
+                    project.PalMode = pal;
+                }
+            }
+
             if (adjustClock)
             {
                 if (BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) > 0)
-                    clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? 1789773 : (float)894886.5);
+                    clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / ((pal ? NesApu.FreqPal : NesApu.FreqNtsc) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? 1 : 2));
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x44, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x44, 4)) & 0xFFFFFFF) / 4000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x48, 4)) > 0)
@@ -1710,7 +1811,7 @@ namespace FamiStudio
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x2c, 4)) > 0)
                     clockMultiplier[ExpansionType.EPSM] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x2C, 4)) & 0xFFFFFFF) / 8000000;
                 if (BitConverter.ToUInt32(vgmFile.AsSpan(0x10, 4)) > 0)
-                    clockMultiplier[ExpansionType.Vrc7] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x10, 4)) / 3579545;
+                    clockMultiplier[ExpansionType.Vrc7] = (float)(BitConverter.ToInt32(vgmFile.AsSpan(0x10, 4)) & 0xFFFFFFF) / 3579545;
 
                 if (ym2149AsEpsm)
                 {
@@ -1718,69 +1819,6 @@ namespace FamiStudio
                         clockMultiplier[ExpansionType.S5B] = (float)BitConverter.ToInt32(vgmFile.AsSpan(0x74, 4)) / (((vgmFile[0x78] & vgmFile[0x79] & 0x10) == 0x10) ? 4000000 : 2000000);
                     ym2149AsEPSM = ym2149AsEpsm;
                 }
-            }
-            var chipCommands = 0;
-            var unknownChipCommands = 0;
-            var samples = 0;
-            var frame = 0;
-            int expansionMask = 0;
-            var samplesPerFrame = 735;
-
-            //Looping through file to check if file is PAL
-            while (vgmDataOffset < vgmFile.Length)
-            {
-                if (vgmCommand == 0x67)  //DataBlock
-                {
-                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4));
-                    vgmDataOffset = vgmDataOffset + dataSize + 7;
-                }
-                else if (vgmCommand == 0x68)
-                    vgmDataOffset = vgmDataOffset + 12;
-                else if (vgmCommand == 0x66)
-                {
-                    vgmDataOffset = vgmDataOffset + 1;
-                    break;
-                }
-
-                else if (vgmCommand == 0x61 || vgmCommand == 0x63 || vgmCommand == 0x62 || (vgmCommand >= 0x70 && vgmCommand <= 0x8f))
-                {
-                    if (vgmCommand == 0x63)
-                    {
-                        vgmDataOffset = vgmDataOffset + 1;
-                        samplesPerFrame = 882;
-                        pal = true;
-                        project.PalMode = pal;
-                        break;
-                    }
-                    else if (vgmCommand == 0x62)
-                        vgmDataOffset = vgmDataOffset + 1;
-                    else if (vgmCommand == 0x61)
-                        vgmDataOffset = vgmDataOffset + 3;
-                    else if (vgmCommand >= 0x80)
-                        vgmDataOffset = vgmDataOffset + 1;
-                    else
-                        vgmDataOffset = vgmDataOffset + 1;
-                }
-                else if (vgmCommand == 0x4F || vgmCommand == 0x50 || vgmCommand == 0x31)
-                    vgmDataOffset = vgmDataOffset + 2;
-                else if (vgmCommand >= 0xC0 && vgmCommand <= 0xDF)
-                    vgmDataOffset = vgmDataOffset + 4;
-                else if (vgmCommand == 0xE0)
-                    vgmDataOffset = vgmDataOffset + 5;
-                else if (vgmCommand >= 0x90 && vgmCommand <= 0x92)
-                    vgmDataOffset = vgmDataOffset + 6;
-                else if (vgmCommand == 0x93)
-                    vgmDataOffset = vgmDataOffset + 11;
-                else if (vgmCommand == 0x94)
-                    vgmDataOffset = vgmDataOffset + 2;
-                else if (vgmCommand == 0x95)
-                    vgmDataOffset = vgmDataOffset + 5;
-                else
-                    vgmDataOffset = vgmDataOffset + 3;
-                if (vgmFile.Length > vgmDataOffset)
-                    vgmCommand = vgmFile[vgmDataOffset];
-                else
-                    break;
             }
 
             vgmDataOffset = BitConverter.ToInt32(vgmFile.AsSpan(0x34, 4)) + 0x34;
@@ -1792,7 +1830,7 @@ namespace FamiStudio
 
                 if (vgmCommand == 0x67)  //DataBlock
                 {
-                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4));
+                    var dataSize = BitConverter.ToInt32(vgmFile.AsSpan(vgmDataOffset + 3, 4)) & 0x7FFFFFFF;
                     var dataType = vgmFile[vgmDataOffset + 2];
                     var dataAddr = BitConverter.ToUInt16(vgmFile.AsSpan(vgmDataOffset + 7, 2));
 
@@ -1897,12 +1935,149 @@ namespace FamiStudio
                     {
                         p = (frame - frameSkip) / song.PatternLength;
                         n = (frame - frameSkip) % song.PatternLength;
-                        song.SetLength(p + 1);
                         frame++;
-                        samples = samples - samplesPerFrame;
+                        song.SetLength(p + 1);
+                        samples -= samplesPerFrame;
+
+                        float quarterStep = isFiveStep ? 3.2f : 4.0f;
+                        apuQuarterFrameClockRemainder += quarterStep;
+
+                        int quarterTicks = (int)apuQuarterFrameClockRemainder;
+                        apuQuarterFrameClockRemainder -= quarterTicks;
+
+                        // Quarter ticks.
+                        for (int t = 0; t < quarterTicks; t++)
+                        {
+                            // Square volume mode.
+                            for (int i = 0; i < 2; i++)
+                            {
+                                int reg = apuRegister[i * 4];
+                                bool sqConstant = (reg & 0x10) != 0;
+                                bool sqLoop = (reg & 0x20) != 0;
+                                int sqVolume = reg & 0x1F;
+
+                                if (!sqConstant)
+                                {
+                                    if (apuDecayCounter[i] > 0)
+                                    {
+                                        apuDecayCounter[i]--;
+                                    }
+                                    else
+                                    {
+                                        apuDecayCounter[i] = sqVolume;
+
+                                        if (apuDecayVolume[i] > 0)
+                                            apuDecayVolume[i]--;
+                                        else if (sqLoop)
+                                            apuDecayVolume[i] = 15;
+                                    }
+                                }
+                            }
+
+                            // Triangle linear counter.
+                            if (apuTriangleLinearReloadFlag)
+                                apuTriangleLinearCounter = apuTriangleLinearReloadValue;
+                            else if (apuTriangleLinearCounter > 0)
+                                apuTriangleLinearCounter--;
+
+                            if (!apuTriangleControlFlag)
+                                apuTriangleLinearReloadFlag = false;
+
+                            // Noise envelope.
+                            var reg400C  = apuRegister[0x0C];
+                            var constant = (reg400C & 0x10) != 0;
+                            var loop     = (reg400C & 0x20) != 0;
+                            var volume   = (reg400C & 0x0F);
+
+                            if (!constant)
+                            {
+                                if (apuDecayCounter[ChannelType.Noise] > 0)
+                                {
+                                    apuDecayCounter[ChannelType.Noise]--;
+                                }
+                                else
+                                {
+                                    apuDecayCounter[ChannelType.Noise] = volume;
+
+                                    if (apuDecayVolume[ChannelType.Noise] > 0)
+                                        apuDecayVolume[ChannelType.Noise]--;
+                                    else if (loop)
+                                        apuDecayVolume[ChannelType.Noise] = 15;
+                                }
+                            }
+
+                            // Half ticks (every other quarter tick).
+                            if ((t & 1) == 0)
+                            {
+                                for (int i = 0; i < 2; i++)
+                                {
+                                    if (apuSquareLengthEnabled[i] && apuSquareLengthCounter[i] > 0)
+                                        apuSquareLengthCounter[i]--;
+                                }
+
+                                if (apuTriangleLengthEnabled && apuTriangleLengthCounter > 0)
+                                    apuTriangleLengthCounter--;
+
+                                if (apuNoiseLengthEnabled && apuNoiseLengthCounter > -1)
+                                    apuNoiseLengthCounter--;
+
+                                // Square sweep.
+                                for (int ch = ChannelType.Square1; ch < ChannelType.Triangle; ch++)
+                                {
+                                    int offset = ch == ChannelType.Square1 ? 0x01 : 0x05;
+                                    int sweepReg = apuRegister[offset];
+
+                                    bool sweepEnable = (sweepReg & 0x80) != 0;
+                                    int  sweepShift  =  sweepReg & 0x07;
+                                    bool sweepNegate = (sweepReg & 0x08) != 0;
+
+                                    if (sweepEnable && sweepShift != 0)
+                                    {
+                                        int basePeriod = apuRegister[2 + ch * 4] | ((apuRegister[3 + ch * 4] & 0x07) << 8);
+                                        int sweepDelta = (basePeriod + apuSweepPitchOffset[ch]) >> sweepShift;
+
+                                        if (sweepNegate)
+                                            sweepDelta = (ch == 0) ? -sweepDelta - 1 : -sweepDelta;
+
+                                        apuSweepPitchOffset[ch] += sweepDelta;
+                                    }
+                                    else
+                                    {
+                                        apuSweepPitchOffset[ch] = 0;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (apuDmcActive)
+                        {
+                            double exactBytes = apuDmcBytesPerFrame + apuDmcByteRemainder;
+                            int wholeBytes = (int)exactBytes;
+                            apuDmcByteRemainder = exactBytes - wholeBytes;
+
+                            apuDmcBytesRemaining -= wholeBytes;
+
+                            if (apuDmcBytesRemaining <= 0)
+                            {
+                                if (apuDmcLoop)
+                                {
+                                    apuDmcBytesRemaining = (apuRegister[0x13] << 4) + 1;
+                                    apuDmcByteRemainder = 0.0;
+                                }
+                                else
+                                {
+                                    apuDmcActive = false;
+                                    apuDmcBytesRemaining = 0;
+                                    apuDmcByteRemainder = 0.0;
+                                }
+                            }
+                        }
+
                         if (frameSkip < frame)
+                        {
                             for (int c = 0; c < song.Channels.Length; c++)
                                 UpdateChannel(p, n, song.Channels[c], channelStates[c]);
+                        }
                     }
                 }
                 else if (vgmCommand == 0x4F || vgmCommand == 0x50 || vgmCommand == 0x31)
@@ -1941,24 +2116,104 @@ namespace FamiStudio
                                     apuRegister[0x07]--;
                             }
 
-                            if (((vgmData[2] & 0x80) >> 7) != 0)
-                                isFiveStep = true;
+                            isFiveStep = (vgmData[2] & 0x80) != 0;
                         }
 
-                        if (vgmData[1] == 0x15 && (vgmData[2] & 0x10) > 0)
-                            dpcmTrigger = true;
+                        // Squares.
+                        if (vgmData[1] == 0x00)
+                            apuSquareLengthEnabled[0] = (vgmData[2] & 0x20) == 0;
 
-                        apuRegister[vgmData[1]] = vgmData[2];
-
-                        // Noise decay (reset on register writes).
-                        if (vgmData[1] == 0x0C || vgmData[1] == 0x0E || vgmData[1] == 0x0F)
+                        if (vgmData[1] == 0x03)
                         {
-                            apuDecayVolume[3]  = 15;
+                            if ((apuRegister[0x15] & 0x01) != 0)
+                                apuSquareLengthCounter[0] = LengthCounterTable[vgmData[2] >> 3];
                         }
 
-                        // DPCM delta write. We have to keep track of these for later.
+                        if (vgmData[1] == 0x04)
+                            apuSquareLengthEnabled[1] = (vgmData[2] & 0x20) == 0;
+
+                        if (vgmData[1] == 0x07)
+                        {
+                            if ((apuRegister[0x15] & 0x02) != 0)
+                                apuSquareLengthCounter[1] = LengthCounterTable[vgmData[2] >> 3];
+                        }
+
+                        // Triangle.
+                        if (vgmData[1] == 0x08)
+                        {
+                            apuTriangleControlFlag = (vgmData[2] & 0x80) != 0;
+                            apuTriangleLengthEnabled = !apuTriangleControlFlag;
+                            apuTriangleLinearReloadValue = vgmData[2] & 0x7F;
+                        }
+
+                        if (vgmData[1] == 0x0B)
+                        {
+                            if ((apuRegister[0x15] & 0x04) != 0)
+                                apuTriangleLengthCounter = LengthCounterTable[vgmData[2] >> 3];
+
+                            apuTriangleLinearReloadFlag = true;
+                        }
+
+                        // Noise.
+                        if (vgmData[1] == 0x0C)
+                        {
+                            apuNoiseLengthEnabled = (vgmData[2] & 0x20) == 0;
+                        }
+
+                        if (vgmData[1] == 0x0F)
+                        {
+                            if ((apuRegister[0x15] & 0x08) != 0)
+                                apuNoiseLengthCounter = LengthCounterTable[vgmData[2] >> 3];
+
+                            apuDecayVolume[3] = 15;
+                        }
+
+                        // DPCM and length counters.
+                        if (vgmData[1] == 0x15)
+                        {
+                            int old4015 = apuRegister[0x15];
+                            int new4015 = vgmData[2];
+                            apuRegister[0x15] = new4015;
+
+                            if ((new4015 & 0x01) == 0) apuSquareLengthCounter[0] = 0;
+                            if ((new4015 & 0x02) == 0) apuSquareLengthCounter[1] = 0;
+                            if ((new4015 & 0x04) == 0) apuTriangleLengthCounter  = 0;
+                            if ((new4015 & 0x08) == 0) apuNoiseLengthCounter     = 0;
+
+                            bool oldDmc = (old4015 & 0x10) != 0;
+                            bool newDmc = (new4015 & 0x10) != 0;
+
+                            if (!oldDmc && newDmc)
+                            {
+                                dpcmTrigger = true;
+                                apuDmcActive = true;
+                                apuDmcBytesRemaining = (apuRegister[0x13] << 4) + 1;
+                                apuDmcByteRemainder = 0.0;
+                            }
+
+                            if (oldDmc && !newDmc)
+                            {
+                                apuDmcActive = false;
+                                apuDmcBytesRemaining = 0;
+                                apuDmcByteRemainder = 0.0;
+                            }
+                        }
+
+                        // DPCM Timing.
+                        if (vgmData[1] == 0x10)
+                        {
+                            int rateIndex = vgmData[2] & 0x0F;
+                            int timerPeriod = pal ? DmcRateTablePal[rateIndex] : DmcRateTableNtsc[rateIndex];
+                            double cpuClock = pal ? NesApu.FreqPal : NesApu.FreqNtsc;
+                            double framesPerSecond = pal ? 50.0 : 60.0;
+
+                            apuDmcLoop = (vgmData[2] & 0x40) != 0;
+                            apuDmcBytesPerFrame = (cpuClock / timerPeriod) / 8.0 / framesPerSecond;
+                        }
+
+                        // DPCM delta write.
                         if (vgmData[1] == 0x11)
-                            framesWithDeltaWrites.Add(frame);
+                            deltaWriteThisFrame = true;
 
                         // FDS.
                         if ((vgmData[1] >= 0x40 && vgmData[1] <= 0x7F) || (vgmData[1] >= 0x20 && vgmData[1] <= 0x3E))
@@ -1976,6 +2231,8 @@ namespace FamiStudio
 
                             expansionMask = expansionMask | ExpansionType.FdsMask;
                         }
+
+                        apuRegister[vgmData[1]] = vgmData[2];
                     }
                     else if (vgmCommand == 0x51)
                     {
@@ -2057,6 +2314,18 @@ namespace FamiStudio
                                 }
                                 epsmFmEnabled[5] = (vgmData[2] & 0xf0) > 0 ? 1 : 0;
                             }
+                        }
+                        else if (vgmData[1] == 0x2d)
+                        {
+                            clockDivider = 0;
+                        }
+                        else if (vgmData[1] == 0x2e)
+                        {
+                            clockDivider = 1;
+                        }
+                        else if (vgmData[1] == 0x2f)
+                        {
+                            clockDivider = 2;
                         }
                         else if (vgmData[1] >= 0x30 && vgmData[1] <= 0x4F)
                             epsmRegisterLo[vgmData[1]] = vgmData[2] & 0x7f;

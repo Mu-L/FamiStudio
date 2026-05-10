@@ -292,7 +292,7 @@
     <Compile Include="Source\App\Mobile\PropertyPage.cs" />
     <Compile Include="Source\App\Mobile\QuickAccessBar.cs" />
     <Compile Include="Source\App\Mobile\RadioButtonList.cs" />
-    <Compile Include="Source\App\Mobile\TopbarDialog.cs" />
+    <Compile Include="Source\App\Mobile\TopBarDialog.cs" />
     <Compile Include="Source\App\Mobile\TutorialDialog.cs" />
     <Compile Include="Source\App\Mobile\VideoPreviewDialog.cs" />
     <Compile Include="Source\Utils\AndroidMidi.cs" />
@@ -724,6 +724,7 @@
     <EmbeddedResource Include="Resources\Misc\VideoWatermark.tga" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\Atlas\AccordionNavigate@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Add@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Algorithm0@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Algorithm1@4x.tga" />
@@ -910,6 +911,7 @@
     <EmbeddedResource Include="Resources\Atlas\MenuToggleRelease@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\MenuToggleSlide@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\MenuTrash@4x.tga" />
+    <EmbeddedResource Include="Resources\Atlas\MenuUnlink@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\MenuWave@4x.tga" />
     <EmbeddedResource Include="Resources\Atlas\Metronome@2x.tga" />
     <EmbeddedResource Include="Resources\Atlas\MinusSmall@2x.tga" />
@@ -1145,13 +1147,13 @@
     <EmbeddedResource Include="Resources\Shaders\Text.vert" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Localization\FamiStudio.deu.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.eng.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.kor.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.por.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.rus.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.spa.ini" />
-    <EmbeddedResource Include="Localization\FamiStudio.zho.ini" />
+    <EmbeddedResource Include="Localization\FamiStudio.deu.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.eng.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.kor.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.por.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.rus.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.spa.ini" WithCulture="false" />
+    <EmbeddedResource Include="Localization\FamiStudio.zho.ini" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\Setup\Demo Songs\*.fms">

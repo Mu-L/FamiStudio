@@ -16,7 +16,6 @@ namespace FamiStudio
              * 10-13: $4010-$4013
              * 14: $4015
              */
-            bool SampleStartedSince4011 = true; //To force writes
 
             int VRC7Addr = 0xFF00;
             int[] VRC7Status = Enumerable.Repeat(0xFF00, 26).ToArray();
@@ -92,11 +91,8 @@ namespace FamiStudio
                         }
                         break;
                     case NesApu.APU_DMC_RAW:
-                        if (regWrite.Value != APUStatus[11] || SampleStartedSince4011)
-                        {
-                            firstPass.Add(regWrite);
-                            APUStatus[11] = regWrite.Value;
-                        }
+                        firstPass.Add(regWrite);
+                        APUStatus[11] = regWrite.Value;
                         break;
                     case NesApu.APU_SND_CHN:
                         if ((regWrite.Value & 0x10) == 0x10 || APUStatus[14] != regWrite.Value)
@@ -104,7 +100,6 @@ namespace FamiStudio
                             firstPass.Add(regWrite);
                             APUStatus[14] = regWrite.Value;
                         }
-                        SampleStartedSince4011 = (regWrite.Value & 0x10) != 0 ? true : false;
                         break;
 
                     case NesApu.VRC7_REG_SEL:

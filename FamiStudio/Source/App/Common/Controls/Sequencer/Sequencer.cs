@@ -91,6 +91,7 @@ namespace FamiStudio
         PatternLocation selectionMin = PatternLocation.Invalid;
         PatternLocation selectionMax = PatternLocation.Invalid;
         PatternLocation highlightLocation = PatternLocation.Invalid;
+        Dictionary<Pattern, int> patternRefCounts = [];
 
         // Hover tracking
         int hoverRow = -1;
@@ -113,6 +114,7 @@ namespace FamiStudio
         TextureAtlasRef bmpDuplicateMove;
         TextureAtlasRef bmpShyOn;
         TextureAtlasRef bmpShyOff;
+        // TextureAtlasRef bmpMenuInstance;
 
         enum CaptureOperation
         {
@@ -203,6 +205,7 @@ namespace FamiStudio
         LocalizedString SelectedPatternPropertiesLabel;
         LocalizedString PatternPropertiesLabel;
         LocalizedString DeletePatternLabel;
+        LocalizedString MakePatternsUniqueLabel;
 
         // Dialogs
         LocalizedString PasteTitle;
@@ -447,6 +450,7 @@ namespace FamiStudio
         {
             selectionMin = PatternLocation.Invalid;
             selectionMax = PatternLocation.Invalid;
+            patternRefCounts?.Clear();
             SelectionChanged?.Invoke();
         }
 
@@ -456,6 +460,7 @@ namespace FamiStudio
             selectionMax = max;
             timeOnlySelection = timeOnly;
             SelectionChanged?.Invoke();
+            UpdateSelectedPatternRefCounts();
         }
 
         private void EnsureSelectionInclude(PatternLocation location)
@@ -536,7 +541,8 @@ namespace FamiStudio
 
             bmpShyOn = g.GetTextureAtlasRef("ShyOn");
             bmpShyOff = g.GetTextureAtlasRef("ShyOff");
-            
+            //bmpMenuInstance = g.GetTextureAtlasRef("MenuInstance");
+
             seekGeometry = new float[]
             {
                 -headerSizeY / 2, 1,
@@ -661,8 +667,8 @@ namespace FamiStudio
             {
                 if (channelVisible[i])
                 {
-                    // For higlighting supported instrments
-                    var isInstSupported = Song.Channels[i].SupportsInstrument(selectedInstrument);
+                    // Dim unsupported channels if enabled in settings
+                    var dim = Settings.DimUnsupportedChannels && !Song.Channels[i].SupportsInstrument(selectedInstrument, false);
 
                     // Icon
                     var isHoverRow = hoverRow == channelToRow[i];
@@ -675,7 +681,7 @@ namespace FamiStudio
                     // Name
                     var font = i == selectedChannelIndex ? Fonts.FontMediumBold : Fonts.FontMedium;
                     var iconHeight = bmpChannels[0].ElementSize.Height * channelBitmapScale;
-                    c.DrawText(Song.Channels[i].LocalizedName, font, channelNamePosX, y + channelIconPosY, Theme.LightGreyColor2.Transparent(isInstSupported ? 255 : 80), TextFlags.MiddleLeft, 0, iconHeight);
+                    c.DrawText(Song.Channels[i].LocalizedName, font, channelNamePosX, y + channelIconPosY, Theme.LightGreyColor2.Transparent(dim ? 80 : 255), TextFlags.MiddleLeft, 0, iconHeight);
 
                     // Force display icon.
                     var ghostHoverOpacity = isHoverRow && (hoverIconMask & 2) != 0 ? 192 : 255;
@@ -684,10 +690,10 @@ namespace FamiStudio
 
                     // Hover
                     if (isHoverRow)
-                        c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.MediumGreyColor1.Transparent(isInstSupported ? 255 : 192));
+                        c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.MediumGreyColor1.Transparent(dim ? 192 : 255));
 
                     // Darken unsupported channel backgrounds
-                    if (!isInstSupported)
+                    if (dim)
                         c.FillRectangle(0, y, channelNameSizeX, y + channelSizeY, Theme.BlackColor.Transparent(80));
 
                     y += channelSizeY;
@@ -919,9 +925,29 @@ namespace FamiStudio
                             c.DrawLine(0, patternHeaderSizeY, sx, patternHeaderSizeY, Theme.BlackColor);
                             c.DrawTexture(bmp, 1.0f, 1.0f + patternHeaderSizeY, sx - 1, patternCacheSizeY, u0, v0, u1, v1);
                             c.DrawText(pattern.Name, Fonts.FontSmall, patternNamePosX, 0, Theme.BlackColor, TextFlags.Left | TextFlags.Middle | TextFlags.Clip, sx - patternNamePosX, patternHeaderSizeY + 1);
-                            if (IsPatternSelected(location))
+
+                            var isSelected = IsPatternSelected(location);
+                            if (isSelected)
                                 c.DrawRectangle(0, 0, sx, channelSizeY, Theme.LightGreyColor1, 3, true, true);
+
                             c.PopTransform();
+
+                            /* Uncomment in major version, along with declaration and initialization of bmpMenuInstance. 
+                            // TODO: Cache bools of valid selection / drag capture operation once at beginning instead of running these every iteration of the loop.
+                            if (captureOperation != CaptureOperation.DragSelection && IsSelectionValid() && patternRefCounts.TryGetValue(pattern, out var count) && count > 1)
+                            {
+                                var scale = bitmapScale * (Platform.IsMobile ? 0.25f : 1.0f);
+                                var iconW = bmpMenuInstance.ElementSize.Width  * scale;
+                                var iconH = bmpMenuInstance.ElementSize.Height * scale;
+                                var iconX = sx / 2 - iconW / 2;
+                                var iconY = patternHeaderSizeY / 2 + channelSizeY / 2 - iconH / 2;
+
+                                // TODO: Change these to foreground so the icons render on top.
+                                c.PushTranslation(0, py);
+                                c.DrawTextureAtlas(bmpMenuInstance, iconX, iconY, scale, Theme.WhiteColor);
+                                c.PopTransform();
+                            }
+                            */
                         }
 
                         if (Platform.IsMobile && highlightLocation == location)
@@ -1852,6 +1878,75 @@ namespace FamiStudio
             MoveCopyOrDuplicateSelection(channelDeltaIdx, patternDeltaIdx, true, copy);
         }
 
+        private bool UpdateSelectedPatternRefCounts()
+        {
+            if (!IsSelectionValid())
+                return false;
+
+            var selectedPatterns = new HashSet<Pattern>();
+
+            foreach (var pattern in GetSelectedPatterns(out _))
+            {
+                if (pattern != null)
+                    selectedPatterns.Add(pattern);
+            }
+
+            var counts = new Dictionary<Pattern, int>();
+            bool duplicateFound = false;
+
+            for (int i = 0; i < Song.Channels.Length; i++)
+            {
+                var channel = Song.Channels[i];
+
+                for (int j = 0; j < Song.Length; j++)
+                {
+                    var pattern = channel.PatternInstances[j];
+                    if (pattern == null || !selectedPatterns.Contains(pattern))
+                        continue;
+
+                    var count = counts.TryGetValue(pattern, out var c) ? c + 1 : 1;
+                    counts[pattern] = count;
+
+                    if (count > 1)
+                        duplicateFound = true;
+                }
+            }
+
+            patternRefCounts = counts;
+            return duplicateFound;
+        }
+
+        private void MakeSelectedPatternsUnique()
+        {
+            if (patternRefCounts.Count == 0)
+                return;
+
+            App.UndoRedoManager.BeginTransaction(TransactionScope.Song, Song.Id);
+            
+            var patternCounts = new Dictionary<Pattern, int>(patternRefCounts); // Safety.
+
+            for (int i = selectionMin.ChannelIndex; i <= selectionMax.ChannelIndex; i++)
+            {
+                var channel = Song.Channels[i];
+                for (int j = selectionMin.PatternIndex; j <= selectionMax.PatternIndex; j++)
+                {
+                    var pattern = channel.PatternInstances[j];
+                    if (pattern != null && patternCounts.TryGetValue(pattern, out var count) && count > 1)
+                    {
+                        var newPattern = CreateUniquePatternClone(pattern, channel);
+                        channel.PatternInstances[j] = newPattern;
+                        patternCounts[pattern]--;
+                    }
+                }
+            }
+
+            Song.DeleteNotesPastMaxInstanceLength();
+            Song.InvalidateCumulativePatternCache();
+            UpdateSelectedPatternRefCounts();
+
+            App.UndoRedoManager.EndTransaction();
+        }
+
         private bool HandleContextMenuPatternArea(int x, int y)
         {
             bool inPatternZone = GetPatternForCoord(x, y, out var location);
@@ -1862,11 +1957,16 @@ namespace FamiStudio
 
                 SetHighlightedPattern(location);
 
-                var menu = new List<ContextMenuOption>(); ;
+                var menu = new List<ContextMenuOption>();
+                var sel  = new List<ContextMenuOption>();
 
                 if (Platform.IsMobile)
                 {
                     menu.Add(new ContextMenuOption("MenuPiano", GoToPianoRollLabel, () => { GotoPianoRoll(location); }));
+                }
+                else if (pattern != null &&!IsPatternSelected(location))
+                {
+                    SetSelection(location, location);
                 }
 
                 if (IsSelectionValid() && !IsPatternSelected(location))
@@ -1892,16 +1992,17 @@ namespace FamiStudio
                     }
                     else
                     {
-                        // Right clicking an existing pattern causes the newly selected
-                        // pattern to duplicate / instantiate on top of itself on desktop.
-                        // Workaround by only selecting if selection is clear.
-                        if (Platform.IsDesktop && !IsSelectionValid())
-                            SetSelection(location, location);
-
                         menu.Add(new ContextMenuOption("MenuProperties", PatternPropertiesLabel, () => { EditPatternProperties(new Point(x, y), pattern, location, false); }, ContextMenuSeparator.Before));
                     }
 
                     menu.Insert(0, new ContextMenuOption("MenuDelete", DeletePatternLabel, () => { DeletePattern(location); }));
+                }
+
+                if (IsPatternSelected(location))
+                {
+                    // TODO: Add the correct icon to make unique rather than the merge one.
+                    if (UpdateSelectedPatternRefCounts())
+                        menu.Insert(1, new ContextMenuOption("MenuUnlink", MakePatternsUniqueLabel, () => { MakeSelectedPatternsUnique(); }));
                 }
 
                 if (menu.Count > 0)
@@ -2358,6 +2459,20 @@ namespace FamiStudio
             return patternIndex;
         }
 
+        private Pattern CreateUniquePatternClone(Pattern pattern, Channel channel)
+        {
+            var newName = pattern.Name;
+            if (!channel.IsPatternNameUnique(newName))
+                newName = channel.GenerateUniquePatternNameSmart(pattern.Name);
+
+            var newPattern = pattern.ShallowClone(channel);
+            newPattern.RemoveUnsupportedChannelFeatures();
+            newPattern.Color = Theme.RandomCustomColor();
+            channel.RenamePattern(newPattern, newName);
+
+            return newPattern;
+        }
+
         private void MoveCopyOrDuplicateSelection(int rowIdxDelta, int patternIdxDelta, bool copy, bool duplicate)
         {
             App.UndoRedoManager.BeginTransaction(TransactionScope.Song, Song.Id);
@@ -2382,21 +2497,11 @@ namespace FamiStudio
 
                         if (duplicate && sourcePattern != null)
                         {
-                            Pattern duplicatedPattern = null;
-                            if (!duplicatePatternMap.TryGetValue(sourcePattern, out duplicatedPattern))
+                            if (!duplicatePatternMap.TryGetValue(sourcePattern, out var duplicatedPattern))
                             {
                                 var destChannel = Song.Channels[ni];
-
-                                var newName = sourcePattern.Name;
-                                if (!destChannel.IsPatternNameUnique(newName))
-                                    newName = destChannel.GenerateUniquePatternNameSmart(sourcePattern.Name);
-
-                                duplicatedPattern = sourcePattern.ShallowClone(destChannel);
-                                duplicatedPattern.RemoveUnsupportedChannelFeatures();
-                                // Intentionally changing the color so that its clear it a clone.
-                                duplicatedPattern.Color = Theme.RandomCustomColor();
+                                duplicatedPattern = CreateUniquePatternClone(sourcePattern, destChannel);
                                 duplicatePatternMap.Add(sourcePattern, duplicatedPattern);
-                                destChannel.RenamePattern(duplicatedPattern, newName);
                             }
                             Song.Channels[ni].PatternInstances[nj] = duplicatedPattern;
                         }
@@ -2562,6 +2667,10 @@ namespace FamiStudio
                 return;
                 Handled:
                     MarkDirty();
+            }
+            else if (e.Right && IsSelectionValid())
+            {
+                UpdateSelectedPatternRefCounts();
             }
         }
 
@@ -3029,6 +3138,8 @@ namespace FamiStudio
 
             if (middle)
                 DoScroll(e.X - mouseLastX, e.Y - mouseLastY);
+            else if (e.Right && patternRefCounts.Count > 0 && (captureOperation == CaptureOperation.SelectRectangle || captureOperation == CaptureOperation.SelectColumn))
+                patternRefCounts.Clear();
 
             UpdateHover(e);
             UpdateToolTip(e);
@@ -3386,6 +3497,7 @@ namespace FamiStudio
             {
                 // TODO: This is overly aggressive. We should have the 
                 // scope on the transaction on the buffer and filter by that.
+                UpdateSelectedPatternRefCounts();
                 InvalidatePatternCache();
                 UpdateRenderCoords();
                 CancelDragSelection();

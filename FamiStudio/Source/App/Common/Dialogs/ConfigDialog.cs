@@ -89,6 +89,7 @@ namespace FamiStudio
         LocalizedString DpcmColorModeTooltip;
         LocalizedString AllowSequencerScrollTooltip;
         LocalizedString ShowRegisterViewerTooltip;
+        LocalizedString DimUnsupportedChannelsTooltip;
         LocalizedString UseOSDialogsTooltip;
         LocalizedString SystemOption;
 
@@ -104,6 +105,7 @@ namespace FamiStudio
         LocalizedString AllowSeqVertScrollLabel;
         LocalizedString ShowFamitrackerStopLabel;
         LocalizedString ShowRegisterViewerLabel;
+        LocalizedString DimUnsupportedChannelsLabel;
         LocalizedString UseOSDialogsLabel;
 
         // Input tooltips
@@ -294,13 +296,14 @@ namespace FamiStudio
                     page.AddCheckBox(AllowSeqVertScrollLabel.Colon, Settings.AllowSequencerVerticalScroll, AllowSequencerScrollTooltip); // 8
                     page.AddCheckBox(ShowFamitrackerStopLabel.Colon, Settings.ShowImplicitStopNotes, ShowFamitrackerStopNotesTooltip); // 9
                     page.AddCheckBox(ShowRegisterViewerLabel.Colon, Settings.ShowRegisterViewer, ShowRegisterViewerTooltip); // 10
-                    page.AddCheckBox(UseOSDialogsLabel.Colon, Settings.UseOSDialogs, UseOSDialogsTooltip); // 11
+                    page.AddCheckBox(DimUnsupportedChannelsLabel.Colon, Settings.DimUnsupportedChannels, DimUnsupportedChannelsTooltip); // 11
+                    page.AddCheckBox(UseOSDialogsLabel.Colon, Settings.UseOSDialogs, UseOSDialogsTooltip); // 12
                         
                     page.SetPropertyVisible(3, Platform.IsDesktop);
                     page.SetPropertyVisible(5, Platform.IsDesktop);
                     page.SetPropertyVisible(6, Platform.IsDesktop);
                     page.SetPropertyVisible(8, Platform.IsDesktop);
-                    page.SetPropertyVisible(11, Platform.IsDesktop);
+                    page.SetPropertyVisible(12, Platform.IsDesktop);
                     break;
                 }
                 case ConfigSection.Input:
@@ -578,7 +581,8 @@ namespace FamiStudio
                     Settings.AllowSequencerVerticalScroll = pageUI.GetPropertyValue<bool>(8);
                     Settings.ShowImplicitStopNotes = pageUI.GetPropertyValue<bool>(9);
                     Settings.ShowRegisterViewer = pageUI.GetPropertyValue<bool>(10);
-                    Settings.UseOSDialogs = pageUI.GetPropertyValue<bool>(11);
+                    Settings.DimUnsupportedChannels = pageUI.GetPropertyValue<bool>(11);
+                    Settings.UseOSDialogs = pageUI.GetPropertyValue<bool>(12);
 
                     // Sound
                     var newAudioApi = pageSound.GetPropertyValue<string>(0);

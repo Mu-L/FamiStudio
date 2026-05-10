@@ -2629,6 +2629,9 @@ namespace FamiStudio
         public Func<ContextMenuCheckState> CheckState;
         public Action Callback;
         public ContextMenuSeparator Separator;
+        public ContextMenuOption[] SubOptions;
+
+        public bool HasSubMenu => SubOptions != null && SubOptions.Length > 0;
 
         public ContextMenuOption(string img, string text, Action callback, ContextMenuSeparator separator = ContextMenuSeparator.None)
         {
@@ -2655,7 +2658,26 @@ namespace FamiStudio
             Text = text;
             Callback = callback;
             Separator = separator;
-            CheckState = checkState;
+            CheckState = checkState ?? (() => ContextMenuCheckState.None);
+        }
+
+        public ContextMenuOption(string img, string text, ContextMenuOption[] subOptions, ContextMenuSeparator separator = ContextMenuSeparator.None)
+        {
+            Image = img;
+            Text = text;
+            SubOptions = subOptions;
+            Separator = separator;
+            CheckState = () => ContextMenuCheckState.None;
+        }
+
+        public ContextMenuOption(string img, string text, string tooltip, ContextMenuOption[] subOptions, ContextMenuSeparator separator = ContextMenuSeparator.None)
+        {
+            Image = img;
+            ToolTip = tooltip;
+            Text = text;
+            SubOptions = subOptions;
+            Separator = separator;
+            CheckState = () => ContextMenuCheckState.None;
         }
     }
 }

@@ -158,16 +158,15 @@ namespace FamiStudio
         public void HideContextMenu()
         {
             if (contextMenu.Visible)
-            { 
-                contextMenu.Visible = false;
-                RemoveControl(contextMenu);
+            {
+                contextMenu.CloseMenuAndChildren();
                 MarkDirty();
             }
         }
 
         public void ConditionalHideContextMenu(Control ctrl)
         {
-            if (ctrl != contextMenu)
+            if (!contextMenu.ContainsMenu(ctrl))
             {
                 HideContextMenu();
             }

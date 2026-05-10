@@ -611,7 +611,7 @@ namespace FamiStudio
             ConditionalEmitDelayedRightClick(false, true, ctrl);
 
             // Dont forward move mouse when a context menu is active.
-            if (ctrl != null && (!container.IsContextMenuActive || ctrl == ContextMenu))
+            if (ctrl != null && (!container.IsContextMenuActive || ContextMenu.ContainsMenu(ctrl)))
             {
                 ctrl.SendPointerMove(e);
                 RefreshCursor(ctrl);

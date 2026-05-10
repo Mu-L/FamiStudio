@@ -16,10 +16,27 @@ namespace FamiStudio
         private TextureAtlasRef bmpMenuCheckOn;
         private TextureAtlasRef bmpMenuCheckOff;
         private TextureAtlasRef bmpMenuRadio;
+        private TextureAtlasRef bmpAccordionNavigate;
         private ContextMenuOption[] menuOptions;
+        private ContextMenu parentMenu;
+        private ContextMenu rootMenu;
+        private ContextMenu childMenu;
+        private ContextMenu deepestOpenMenu;
+        private int childMenuIndex = -1;
 
         private const ContextMenuSeparator flagBefore = Platform.IsMobile ? ContextMenuSeparator.MobileBefore : ContextMenuSeparator.Before;
         private const ContextMenuSeparator flagAfter  = Platform.IsMobile ? ContextMenuSeparator.MobileAfter  : ContextMenuSeparator.After;
+       
+        public bool hasParentMenu => parentMenu != null && parentMenu.Visible;
+        public bool HasChildMenu => childMenu != null && childMenu.Visible;
+
+        public bool ContainsMenu(Control ctrl)
+        {
+            if (ctrl == this)
+                return true;
+
+            return childMenu != null && childMenu.ContainsMenu(ctrl);
+        }
 
         public ContextMenu()
         {
@@ -31,9 +48,10 @@ namespace FamiStudio
         {
             var g = ParentWindow.Graphics;
 
-            bmpMenuCheckOn  = g.GetTextureAtlasRef("MenuCheckOn");
-            bmpMenuCheckOff = g.GetTextureAtlasRef("MenuCheckOff");
-            bmpMenuRadio    = g.GetTextureAtlasRef("MenuRadio");
+            bmpMenuCheckOn       = g.GetTextureAtlasRef("MenuCheckOn");
+            bmpMenuCheckOff      = g.GetTextureAtlasRef("MenuCheckOff");
+            bmpMenuRadio         = g.GetTextureAtlasRef("MenuRadio");
+            bmpAccordionNavigate = g.GetTextureAtlasRef("AccordionNavigate");
             
             UpdateLayout();
         }
@@ -58,6 +76,7 @@ namespace FamiStudio
                 iconSizeX = 0;
 
                 bmpContextMenu = new TextureAtlasRef[menuOptions.Length];
+                var hasAnySubMenu = false;
 
                 for (var i = 0; i < menuOptions.Length; i++)
                 {
@@ -76,6 +95,9 @@ namespace FamiStudio
                     {
                         iconSizeX = Math.Max(bmpMenuCheckOn.ElementSize.Width, iconSizeX);
                     }
+
+                    if (option.HasSubMenu)
+                        hasAnySubMenu = true;
                 }
 
 
@@ -90,7 +112,8 @@ namespace FamiStudio
                     itemSizeY = DpiScaling.ScaleForWindow(22);
                 }
 
-                width = Math.Max(minSizeX, margin + iconSizeX + textSizeX + margin);
+                var extraArrowWidth = hasAnySubMenu ? DpiScaling.ScaleForWindow(12) : 0;
+                width = Math.Max(minSizeX, margin + iconSizeX + textSizeX + extraArrowWidth + margin * 2);
                 height = menuOptions.Length * itemSizeY;
             }
         }
@@ -112,11 +135,126 @@ namespace FamiStudio
 
         private void ActivateItem(int index)
         {
-            SetHoveredItemIndex(-1); // Make sure previous index isn't highlighted on next menu open.
+            if (index < 0 || index >= menuOptions.Length)
+                return;
+
+            var option = menuOptions[index];
+            if (option.HasSubMenu && Platform.IsDesktop)
+            {
+                OpenChildMenu(index);
+                return;
+            }
+
             App.HideContextMenu();
-            MarkDirty();
+
+            // For mobile, we just replace the previous context menu with a new one.
+            if (option.HasSubMenu)
+            {
+                App.ShowContextMenuAsync(option.SubOptions);
+                return;
+            }
+
             Platform.VibrateTick();
-            menuOptions[index].Callback();
+
+            MarkDirty();
+            option.Callback?.Invoke();
+        }
+
+        private void CloseChildMenu()
+        {
+            if (childMenu != null)
+            {
+                childMenu.CloseMenuAndChildren();
+
+                if (rootMenu != null)
+                    rootMenu.deepestOpenMenu = this;
+                else
+                    deepestOpenMenu = this;
+
+                childMenu = null;
+                childMenuIndex = -1;
+                MarkDirty();
+            }
+        }
+
+        private void OpenChildMenu(int index)
+        {
+            if (index < 0 || index >= menuOptions.Length)
+            {
+                CloseChildMenu();
+                return;
+            }
+
+            var option = menuOptions[index];
+
+            if (!option.HasSubMenu)
+            {
+                CloseChildMenu();
+                return;
+            }
+
+            if (childMenu != null && childMenuIndex == index)
+                return;
+
+            CloseChildMenu();
+
+            childMenu = new ContextMenu();
+            childMenu.parentMenu = this;
+            childMenu.rootMenu = rootMenu ?? this;
+            childMenu.Initialize(option.SubOptions);
+            childMenu.Visible = true;
+
+            container.AddControl(childMenu);
+
+            var initYPos   = WindowPosition.Y + index * itemSizeY;
+            var fromBottom = initYPos + childMenu.Height > container.Height;
+            var yPos       = fromBottom ? initYPos + itemSizeY - childMenu.Height : initYPos;
+
+            // A little nitpicky thing. Separators are a pixel lower than the bottom of the menu would be.
+            if (fromBottom && hoveredItemIndex < menuOptions.Length - 1)
+                yPos += 1;
+
+            childMenu.Move(WindowPosition.X + Width - 1, yPos);
+
+            childMenuIndex = index;
+            childMenu.rootMenu.deepestOpenMenu = childMenu;
+
+            MarkDirty();
+        }
+
+        private void CloseDeepestChildMenu()
+        {
+            var root = rootMenu ?? this;
+            var deepest = root.deepestOpenMenu;
+            if (deepest != null && deepest.parentMenu != null)
+            {
+                deepest.parentMenu.CloseChildMenu();
+            }
+        }
+
+        public void CloseMenuAndChildren()
+        {
+            if (childMenu != null)
+            {
+                childMenu.CloseMenuAndChildren();
+                childMenu = null;
+                childMenuIndex = -1;
+            }
+
+            hoveredItemIndex = -1;
+
+            if (rootMenu == this)
+                deepestOpenMenu = null;
+
+            visible = false;
+
+            if (HasParent)
+                ParentContainer.RemoveControl(this);
+        }
+
+        public void ResetHoverIndex()
+        {
+            SetHoveredItemIndex(-1);
         }
 
         protected override void OnPointerUp(PointerEventArgs e)
@@ -139,10 +277,10 @@ namespace FamiStudio
 
         protected override void OnPointerLeave(EventArgs e)
         {
-            if (ParentWindow != null && visible)
-            { 
-                SetHoveredItemIndex(-1);
-            }
+            //if (ParentWindow != null && visible)
+            //{ 
+            //    SetHoveredItemIndex(-1);
+            //}
         }
 
         protected override void OnTouchClick(PointerEventArgs e)
@@ -156,34 +294,64 @@ namespace FamiStudio
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            if (HasChildMenu)
+            {
+                if (e.Key == Keys.Up ||
+                    e.Key == Keys.Down ||
+                    e.Key == Keys.Enter ||
+                    e.Key == Keys.KeypadEnter ||
+                    e.Key == Keys.Right)
+                {
+                    childMenu.OnKeyDown(e);
+                    return;
+                }
+                else if (e.Key == Keys.Left)
+                {
+                    CloseDeepestChildMenu();
+                    return;
+                }
+            }
+
             if (e.Key == Keys.Escape)
             {
-                SetHoveredItemIndex(-1);
                 App.HideContextMenu();
             }
-            else 
+            else if (hoveredItemIndex >= 0 && (e.Key == Keys.Enter || e.Key == Keys.KeypadEnter))
             {
-                if (hoveredItemIndex >= 0 && (e.Key == Keys.Enter || e.Key == Keys.KeypadEnter))
+                ActivateItem(hoveredItemIndex);
+            }
+            else if (e.Key == Keys.Up)
+            {
+                SetHoveredItemIndex(Math.Clamp(hoveredItemIndex - 1, 0, menuOptions.Length - 1), true);
+            }
+            else if (e.Key == Keys.Down)
+            {
+                SetHoveredItemIndex(Math.Clamp(hoveredItemIndex + 1, 0, menuOptions.Length - 1), true);
+            }
+            else if (e.Key == Keys.Right)
+            {
+                if (hoveredItemIndex >= 0 && menuOptions[hoveredItemIndex].HasSubMenu)
                 {
-                    ActivateItem(hoveredItemIndex);
-                }
-                else if (e.Key == Keys.Up)
-                {
-                    SetHoveredItemIndex(Math.Clamp(hoveredItemIndex - 1, 0, menuOptions.Length - 1));
-                }
-                else if (e.Key == Keys.Down)
-                {
-                    SetHoveredItemIndex(Math.Clamp(hoveredItemIndex + 1, 0, menuOptions.Length - 1));
+                    OpenChildMenu(hoveredItemIndex);
                 }
             }
         }
 
-        protected void SetHoveredItemIndex(int idx)
+        protected void SetHoveredItemIndex(int idx, bool kb = false)
         {
             if (idx != hoveredItemIndex && Platform.IsDesktop)
             {
                 hoveredItemIndex = idx;
                 UpdateTooltip();
+
+                if (!kb)
+                {
+                    if (hoveredItemIndex >= 0 && menuOptions[hoveredItemIndex].HasSubMenu)
+                        OpenChildMenu(hoveredItemIndex);
+                    else
+                        CloseChildMenu();
+                }
+
                 MarkDirty();
             }
         }
@@ -239,6 +407,11 @@ namespace FamiStudio
                 }
 
                 c.DrawText(option.Text, Fonts.FontMedium, margin + iconSizeX, 0, hover ? Theme.LightGreyColor2 : Theme.LightGreyColor1, TextFlags.MiddleLeft, Width, itemSizeY);
+                if (option.HasSubMenu)
+                {
+                    var arrowX = Width - margin - bmpAccordionNavigate.ElementSize.Width;
+                    c.DrawTextureAtlasCentered(bmpAccordionNavigate, arrowX, 0, bmpAccordionNavigate.ElementSize.Width, itemSizeY, 1, hover ? Theme.LightGreyColor2 : Theme.LightGreyColor1);
+                }
                 c.PopTransform();
 
                 prevWantedSeparator = option.Separator.HasFlag(flagAfter);

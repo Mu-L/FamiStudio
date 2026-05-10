@@ -449,13 +449,15 @@ namespace FamiStudio
             return env;
         }
 
-        public void SetFromPreset(int type, int preset)
+        public void SetFromPreset(int type, int preset, int n163WavSize = 0)
         {
             GetMinMaxValueForType(null, type, out var min, out var max);
 
-            Debug.Assert(length % chunkLength == 0);
+            var len = (type == EnvelopeType.N163Waveform && n163WavSize > 0) ? n163WavSize : chunkLength;
 
-            var localChunkLength = chunkLength == 1 ? length : chunkLength;
+            Debug.Assert(length % len == 0);
+
+            var localChunkLength = len == 1 ? length : len;
             var localChunkCount  = length / localChunkLength;
 
             for (int j = 0; j < localChunkCount; j++)
@@ -511,10 +513,10 @@ namespace FamiStudio
             }
         }
 
-        public bool ValidatePreset(int type, int preset)
+        public bool ValidatePreset(int type, int preset, int n163WavSize = 0)
         {
             var oldValues = values.Clone() as sbyte[];
-            SetFromPreset(type, preset);
+            SetFromPreset(type, preset, n163WavSize);
             var matches = true;
 
             for (int i = 0; i < length; i++)
